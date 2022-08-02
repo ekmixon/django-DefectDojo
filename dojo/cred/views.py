@@ -609,15 +609,21 @@ def delete_cred_controller(request, destination_url, id, ttid):
         delete_cred = False
 
         # Determine if the credential can be deleted
-        if destination_url == "cred":
-            if cred is None:
+        if (
+            destination_url == "cred"
+            and cred is None
+            or destination_url != "cred"
+            and destination_url != "all_cred_product"
+            and destination_url != "view_engagement"
+            and destination_url in ["view_test", "view_finding"]
+        ):
+            delete_cred = True
+        elif destination_url == "cred":
+            cred_lookup = Cred_Mapping.objects.filter(
+                cred_id=cred.cred_id).exclude(product__isnull=True)
+            message = "Credential is associated with product(s). Remove the credential from the product(s) before this credential can be deleted."
+            if cred_lookup.exists() is False:
                 delete_cred = True
-            else:
-                cred_lookup = Cred_Mapping.objects.filter(
-                    cred_id=cred.cred_id).exclude(product__isnull=True)
-                message = "Credential is associated with product(s). Remove the credential from the product(s) before this credential can be deleted."
-                if cred_lookup.exists() is False:
-                    delete_cred = True
         elif destination_url == "all_cred_product":
             cred_lookup = Cred_Mapping.objects.filter(
                 cred_id=cred.cred_id).exclude(engagement__isnull=True)
@@ -633,19 +639,14 @@ def delete_cred_controller(request, destination_url, id, ttid):
                     cred_id=cred.cred_id).exclude(finding__isnull=True)
                 message = "Credential is associated with finding(s). Remove the finding(s) before this credential can be deleted."
                 delete_cred = True
-        elif destination_url == "view_test" or destination_url == "view_finding":
-            delete_cred = True
-
         # Allow deletion if no credentials are associated
-        if delete_cred is True:
+        if delete_cred:
             message = "Credential Successfully Deleted."
             status_tag = "alert-success"
             # check if main cred delete
             if destination_url == "cred":
                 cred = Cred_User.objects.get(pk=ttid)
-                cred.delete()
-            else:
-                cred.delete()
+            cred.delete()
         else:
             status_tag = 'alert-danger'
 

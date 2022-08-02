@@ -13,11 +13,7 @@ def get_authorized_endpoints(permission, queryset=None, user=None):
     if user is None:
         return Endpoint.objects.none()
 
-    if queryset is None:
-        endpoints = Endpoint.objects.all()
-    else:
-        endpoints = queryset
-
+    endpoints = Endpoint.objects.all() if queryset is None else queryset
     if user.is_superuser:
         return endpoints
 

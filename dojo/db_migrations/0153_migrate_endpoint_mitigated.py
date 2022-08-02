@@ -10,9 +10,9 @@ class Migration(migrations.Migration):
         ('dojo', '0152_notifications_template'),
     ]
 
-    def migrate_endpoint_mitigated(apps, schema_editor):
-        Endpoint = apps.get_model('dojo', 'Endpoint')
-        Endpoint_Status = apps.get_model('dojo', 'Endpoint_Status')
+    def migrate_endpoint_mitigated(self, schema_editor):
+        Endpoint = self.get_model('dojo', 'Endpoint')
+        Endpoint_Status = self.get_model('dojo', 'Endpoint_Status')
 
         all_ep = Endpoint.objects.filter(mitigated=True)
 

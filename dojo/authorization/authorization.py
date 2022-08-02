@@ -14,13 +14,12 @@ def user_has_configuration_permission(user, permission, legacy=None):
 
     if settings.FEATURE_CONFIGURATION_AUTHORIZATION:
         return user.has_perm(permission)
+    if legacy == 'staff':
+        return user.is_staff
+    elif legacy == 'superuser':
+        return user.is_superuser
     else:
-        if legacy == 'staff':
-            return user.is_staff
-        elif legacy == 'superuser':
-            return user.is_superuser
-        else:
-            raise Exception(f'{legacy} is not allowed for parameter legacy')
+        raise Exception(f'{legacy} is not allowed for parameter legacy')
 
 
 def user_has_permission(user, obj, permission):
@@ -28,21 +27,21 @@ def user_has_permission(user, obj, permission):
     if user.is_superuser:
         return True
 
-    if isinstance(obj, Product_Type) or isinstance(obj, Product):
-        # Global roles are only relevant for product types, products and their dependent objects
-        if user_has_global_permission(user, permission):
-            return True
+    if isinstance(obj, (Product_Type, Product)) and user_has_global_permission(
+        user, permission
+    ):
+        return True
 
     if isinstance(obj, Product_Type):
         # Check if the user has a role for the product type with the requested permissions
         member = get_product_type_member(user, obj)
         if member is not None and role_has_permission(member.role.id, permission):
             return True
-        # Check if the user is in a group with a role for the product type with the requested permissions
-        for product_type_group in get_product_type_groups(user, obj):
-            if role_has_permission(product_type_group.role.id, permission):
-                return True
-        return False
+        return any(
+            role_has_permission(product_type_group.role.id, permission)
+            for product_type_group in get_product_type_groups(user, obj)
+        )
+
     elif (isinstance(obj, Product) and
             permission.value >= Permissions.Product_View.value):
         # Products inherit permissions of their product type
@@ -53,16 +52,19 @@ def user_has_permission(user, obj, permission):
         member = get_product_member(user, obj)
         if member is not None and role_has_permission(member.role.id, permission):
             return True
-        # Check if the user is in a group with a role for the product with the requested permissions
-        for product_group in get_product_groups(user, obj):
-            if role_has_permission(product_group.role.id, permission):
-                return True
-        return False
+        return any(
+            role_has_permission(product_group.role.id, permission)
+            for product_group in get_product_groups(user, obj)
+        )
+
     elif isinstance(obj, Engagement) and permission in Permissions.get_engagement_permissions():
         return user_has_permission(user, obj.product, permission)
     elif isinstance(obj, Test) and permission in Permissions.get_test_permissions():
         return user_has_permission(user, obj.engagement.product, permission)
-    elif (isinstance(obj, Finding) or isinstance(obj, Stub_Finding)) and permission in Permissions.get_finding_permissions():
+    elif (
+        isinstance(obj, (Finding, Stub_Finding))
+        and permission in Permissions.get_finding_permissions()
+    ):
         return user_has_permission(user, obj.test.engagement.product, permission)
     elif isinstance(obj, Finding_Group) and permission in Permissions.get_finding_group_permissions():
         return user_has_permission(user, obj.test.engagement.product, permission)
@@ -101,8 +103,9 @@ def user_has_permission(user, obj, permission):
         else:
             return user_has_permission(user, obj.group, permission)
     else:
-        raise NoAuthorizationImplementedError('No authorization implemented for class {} and permission {}'.
-            format(type(obj).__name__, permission))
+        raise NoAuthorizationImplementedError(
+            f'No authorization implemented for class {type(obj).__name__} and permission {permission}'
+        )
 
 
 def user_has_global_permission(user, permission):
@@ -113,22 +116,22 @@ def user_has_global_permission(user, permission):
     if user.is_superuser:
         return True
 
-    if permission == Permissions.Product_Type_Add:
-        if settings.FEATURE_CONFIGURATION_AUTHORIZATION:
-            if user_has_configuration_permission(user, 'dojo.add_product_type'):
-                return True
-        else:
-            if user.is_staff:
-                return True
-
+    if permission == Permissions.Product_Type_Add and (
+        settings.FEATURE_CONFIGURATION_AUTHORIZATION
+        and user_has_configuration_permission(user, 'dojo.add_product_type')
+        or not settings.FEATURE_CONFIGURATION_AUTHORIZATION
+        and user.is_staff
+    ):
+        return True
     if hasattr(user, 'global_role') and user.global_role.role is not None and role_has_global_permission(user.global_role.role.id, permission):
         return True
 
-    for group in get_groups(user):
-        if hasattr(group, 'global_role') and group.global_role.role is not None and role_has_global_permission(group.global_role.role.id, permission):
-            return True
-
-    return False
+    return any(
+        hasattr(group, 'global_role')
+        and group.global_role.role is not None
+        and role_has_global_permission(group.global_role.role.id, permission)
+        for group in get_groups(user)
+    )
 
 
 def user_has_configuration_permission_or_403(user, permission, legacy=None):
@@ -148,7 +151,7 @@ def user_has_global_permission_or_403(user, permission):
 
 def get_roles_for_permission(permission):
     if not Permissions.has_value(permission):
-        raise PermissionDoesNotExistError('Permission {} does not exist'.format(permission))
+        raise PermissionDoesNotExistError(f'Permission {permission} does not exist')
     roles_for_permissions = set()
     roles = get_roles_with_permissions()
     for role in roles:
@@ -162,19 +165,17 @@ def role_has_permission(role, permission):
     if role is None:
         return False
     if not Roles.has_value(role):
-        raise RoleDoesNotExistError('Role {} does not exist'.format(role))
+        raise RoleDoesNotExistError(f'Role {role} does not exist')
     roles = get_roles_with_permissions()
     permissions = roles.get(role)
-    if not permissions:
-        return False
-    return permission in permissions
+    return permission in permissions if permissions else False
 
 
 def role_has_global_permission(role, permission):
     if role is None:
         return False
     if not Roles.has_value(role):
-        raise RoleDoesNotExistError('Role {} does not exist'.format(role))
+        raise RoleDoesNotExistError(f'Role {role} does not exist')
     roles = get_global_roles_with_permissions()
     permissions = roles.get(role)
     if permissions and permission in permissions:
@@ -203,10 +204,12 @@ def get_product_member(user, product):
 
 @cache_for_request
 def get_product_member_dict(user):
-    pm_dict = {}
-    for product_member in Product_Member.objects.select_related('product').select_related('role').filter(user=user):
-        pm_dict[product_member.product.id] = product_member
-    return pm_dict
+    return {
+        product_member.product.id: product_member
+        for product_member in Product_Member.objects.select_related('product')
+        .select_related('role')
+        .filter(user=user)
+    }
 
 
 def get_product_type_member(user, product_type):
@@ -215,10 +218,14 @@ def get_product_type_member(user, product_type):
 
 @cache_for_request
 def get_product_type_member_dict(user):
-    ptm_dict = {}
-    for product_type_member in Product_Type_Member.objects.select_related('product_type').select_related('role').filter(user=user):
-        ptm_dict[product_type_member.product_type.id] = product_type_member
-    return ptm_dict
+    return {
+        product_type_member.product_type.id: product_type_member
+        for product_type_member in Product_Type_Member.objects.select_related(
+            'product_type'
+        )
+        .select_related('role')
+        .filter(user=user)
+    }
 
 
 def get_product_groups(user, product):
@@ -266,7 +273,9 @@ def get_group_member(user, group):
 
 @cache_for_request
 def get_group_members_dict(user):
-    gu_dict = {}
-    for group_member in Dojo_Group_Member.objects.select_related('group').select_related('role').filter(user=user):
-        gu_dict[group_member.group.id] = group_member
-    return gu_dict
+    return {
+        group_member.group.id: group_member
+        for group_member in Dojo_Group_Member.objects.select_related('group')
+        .select_related('role')
+        .filter(user=user)
+    }

@@ -9,12 +9,15 @@ logger = logging.getLogger(__name__)
 
 class Migration(migrations.Migration):
 
-    def set_risk_accepted_flag_on_findings(apps, schema_editor):
+    def set_risk_accepted_flag_on_findings(self, schema_editor):
         # We can't import the models directly as it may be a newer
         # version than this migration expects. We use the historical version.
         logger.info('Setting risk_accepted flag on findings that have an existing risk acceptance.')
 
-        accepted_findings = apps.get_model('dojo', 'Finding').objects.filter(risk_acceptance__isnull=False)
+        accepted_findings = self.get_model('dojo', 'Finding').objects.filter(
+            risk_acceptance__isnull=False
+        )
+
 
         # logger.debug(accepted_findings.query)
 

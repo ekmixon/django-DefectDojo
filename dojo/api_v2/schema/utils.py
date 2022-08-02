@@ -31,10 +31,7 @@ def try_apply(obj, resolver):
     Returns:
         object: the original object if it was not resolve otherwise the resolved LazySchemaRef
     """
-    if type(obj) is LazySchemaRef:
-        return obj.apply(resolver)
-    else:
-        return obj
+    return obj.apply(resolver) if type(obj) is LazySchemaRef else obj
 
 
 def resolve_lazy_ref(schema, resolver):

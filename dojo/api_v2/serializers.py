@@ -166,11 +166,7 @@ class TagListSerializerField(serializers.ListField):
 
             # data_safe.append(s)
 
-        # internal_value = ','.join(data_safe)
-
-        internal_value = tagulous.utils.render_tags(data)
-
-        return internal_value
+        return tagulous.utils.render_tags(data)
         # return data
 
     def to_representation(self, value):
@@ -182,7 +178,7 @@ class TagListSerializerField(serializers.ListField):
             elif isinstance(value, str):
                 value = tagulous.utils.parse_tags(value)
             else:
-                raise ValueError('unable to convert %s into list of tags' % type(value).__name__)
+                raise ValueError(f'unable to convert {type(value).__name__} into list of tags')
         return value
 
 
@@ -216,9 +212,8 @@ class TaggitSerializer(serializers.Serializer):
 
         for key in list(self.fields.keys()):
             field = self.fields[key]
-            if isinstance(field, TagListSerializerField):
-                if key in validated_data:
-                    to_be_tagged[key] = validated_data.pop(key)
+            if isinstance(field, TagListSerializerField) and key in validated_data:
+                to_be_tagged[key] = validated_data.pop(key)
 
         return (to_be_tagged, validated_data)
 
@@ -303,14 +298,12 @@ class RequestResponseSerializerField(serializers.ListSerializer):
         return data
 
     def to_representation(self, value):
-        if not isinstance(value, RequestResponseDict):
-            if not isinstance(value, list):
+        if not isinstance(value, RequestResponseDict) and not isinstance(
+            value, list
+        ):
                 # this will trigger when a queryset is found...
-                if self.order_by:
-                    burps = value.all().order_by(*self.order_by)
-                else:
-                    burps = value.all()
-                value = [{'request': burp.get_request(), 'response': burp.get_response()} for burp in burps]
+            burps = value.all().order_by(*self.order_by) if self.order_by else value.all()
+            value = [{'request': burp.get_request(), 'response': burp.get_response()} for burp in burps]
 
         return value
 
@@ -513,13 +506,13 @@ class DojoGroupMemberSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.instance is not None and \
-                data.get('group') != self.instance.group and \
-                not user_has_permission(self.context['request'].user, data.get('group'), Permissions.Group_Manage_Members):
+                    data.get('group') != self.instance.group and \
+                    not user_has_permission(self.context['request'].user, data.get('group'), Permissions.Group_Manage_Members):
             raise PermissionDenied('You are not permitted to add a user to this group')
 
         if self.instance is None or \
-                data.get('group') != self.instance.group or \
-                data.get('user') != self.instance.user:
+                    data.get('group') != self.instance.group or \
+                    data.get('user') != self.instance.user:
             members = Dojo_Group_Member.objects.filter(group=data.get('group'), user=data.get('user'))
             if members.count() > 0:
                 raise ValidationError('Dojo_Group_Member already exists')
@@ -627,13 +620,13 @@ class ProductMemberSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.instance is not None and \
-                data.get('product') != self.instance.product and \
-                not user_has_permission(self.context['request'].user, data.get('product'), Permissions.Product_Manage_Members):
+                    data.get('product') != self.instance.product and \
+                    not user_has_permission(self.context['request'].user, data.get('product'), Permissions.Product_Manage_Members):
             raise PermissionDenied('You are not permitted to add a member to this product')
 
         if self.instance is None or \
-                data.get('product') != self.instance.product or \
-                data.get('user') != self.instance.user:
+                    data.get('product') != self.instance.product or \
+                    data.get('user') != self.instance.user:
             members = Product_Member.objects.filter(product=data.get('product'), user=data.get('user'))
             if members.count() > 0:
                 raise ValidationError('Product_Member already exists')
@@ -652,13 +645,13 @@ class ProductGroupSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.instance is not None and \
-                data.get('product') != self.instance.product and \
-                not user_has_permission(self.context['request'].user, data.get('product'), Permissions.Product_Group_Add):
+                    data.get('product') != self.instance.product and \
+                    not user_has_permission(self.context['request'].user, data.get('product'), Permissions.Product_Group_Add):
             raise PermissionDenied('You are not permitted to add a group to this product')
 
         if self.instance is None or \
-                data.get('product') != self.instance.product or \
-                data.get('group') != self.instance.group:
+                    data.get('product') != self.instance.product or \
+                    data.get('group') != self.instance.group:
             members = Product_Group.objects.filter(product=data.get('product'), group=data.get('group'))
             if members.count() > 0:
                 raise ValidationError('Product_Group already exists')
@@ -677,13 +670,13 @@ class ProductTypeMemberSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.instance is not None and \
-                data.get('product_type') != self.instance.product_type and \
-                not user_has_permission(self.context['request'].user, data.get('product_type'), Permissions.Product_Type_Manage_Members):
+                    data.get('product_type') != self.instance.product_type and \
+                    not user_has_permission(self.context['request'].user, data.get('product_type'), Permissions.Product_Type_Manage_Members):
             raise PermissionDenied('You are not permitted to add a member to this product type')
 
         if self.instance is None or \
-                data.get('product_type') != self.instance.product_type or \
-                data.get('user') != self.instance.user:
+                    data.get('product_type') != self.instance.product_type or \
+                    data.get('user') != self.instance.user:
             members = Product_Type_Member.objects.filter(product_type=data.get('product_type'), user=data.get('user'))
             if members.count() > 0:
                 raise ValidationError('Product_Type_Member already exists')
@@ -707,13 +700,13 @@ class ProductTypeGroupSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.instance is not None and \
-                data.get('product_type') != self.instance.product_type and \
-                not user_has_permission(self.context['request'].user, data.get('product_type'), Permissions.Product_Type_Group_Add):
+                    data.get('product_type') != self.instance.product_type and \
+                    not user_has_permission(self.context['request'].user, data.get('product_type'), Permissions.Product_Type_Group_Add):
             raise PermissionDenied('You are not permitted to add a group to this product type')
 
         if self.instance is None or \
-                data.get('product_type') != self.instance.product_type or \
-                data.get('group') != self.instance.group:
+                    data.get('product_type') != self.instance.product_type or \
+                    data.get('group') != self.instance.group:
             members = Product_Type_Group.objects.filter(product_type=data.get('product_type'), group=data.get('group'))
             if members.count() > 0:
                 raise ValidationError('Product_Type_Group already exists')
@@ -739,10 +732,12 @@ class EngagementSerializer(TaggitSerializer, serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        if self.context['request'].method == 'POST':
-            if data['target_start'] > data['target_end']:
-                raise serializers.ValidationError(
-                    'Your target start date exceeds your target end date')
+        if (
+            self.context['request'].method == 'POST'
+            and data['target_start'] > data['target_end']
+        ):
+            raise serializers.ValidationError(
+                'Your target start date exceeds your target end date')
         return data
 
     def build_relational_field(self, field_name, relation_info):
@@ -850,7 +845,7 @@ class EndpointSerializer(TaggitSerializer, serializers.ModelSerializer):
     def validate(self, data):
         # print('EndpointSerialize.validate')
 
-        if not self.context['request'].method == 'PATCH':
+        if self.context['request'].method != 'PATCH':
             if 'product' not in data:
                 raise serializers.ValidationError('Product is required')
             protocol = data.get('protocol')
@@ -938,11 +933,11 @@ class JIRAIssueSerializer(serializers.ModelSerializer):
             finding = data.get('finding', None)
             finding_group = data.get('finding_group', None)
 
-        if ((engagement and not finding and not finding_group) or
-                (finding and not engagement and not finding_group) or
-                (finding_group and not engagement and not finding)):
-            pass
-        else:
+        if (
+            (not engagement or finding or finding_group)
+            and (not finding or engagement or finding_group)
+            and (not finding_group or engagement or finding)
+        ):
             raise serializers.ValidationError('Either engagement or finding or finding_group has to be set.')
 
         return data
@@ -1212,10 +1207,13 @@ class FindingSerializer(TaggitSerializer, serializers.ModelSerializer):
         # Save vulnerability ids and pop them
         if 'vulnerability_id_set' in validated_data:
             vulnerability_id_set = validated_data.pop('vulnerability_id_set')
-            vulnerability_ids = list()
+            vulnerability_ids = []
             if vulnerability_id_set:
-                for vulnerability_id in vulnerability_id_set:
-                    vulnerability_ids.append(vulnerability_id['vulnerability_id'])
+                vulnerability_ids.extend(
+                    vulnerability_id['vulnerability_id']
+                    for vulnerability_id in vulnerability_id_set
+                )
+
             save_vulnerability_ids(instance, vulnerability_ids)
 
         instance = super(TaggitSerializer, self).update(instance, validated_data)
@@ -1226,9 +1224,7 @@ class FindingSerializer(TaggitSerializer, serializers.ModelSerializer):
         if push_to_jira:
             instance.save(push_to_jira=push_to_jira)
 
-        # not sure why we are returning a tag_object, but don't want to change too much now as we're just fixing a bug
-        tag_object = self._save_tags(instance, to_be_tagged)
-        return tag_object
+        return self._save_tags(instance, to_be_tagged)
 
     def validate(self, data):
         if self.context['request'].method == 'PATCH':
@@ -1251,9 +1247,12 @@ class FindingSerializer(TaggitSerializer, serializers.ModelSerializer):
             raise serializers.ValidationError('False positive findings cannot '
                                               'be verified.')
 
-        if is_risk_accepted and not self.instance.risk_accepted:
-            if not self.instance.test.engagement.product.enable_simple_risk_acceptance:
-                raise serializers.ValidationError('Simple risk acceptance is disabled for this product, use the UI to accept this finding.')
+        if (
+            is_risk_accepted
+            and not self.instance.risk_accepted
+            and not self.instance.test.engagement.product.enable_simple_risk_acceptance
+        ):
+            raise serializers.ValidationError('Simple risk acceptance is disabled for this product, use the UI to accept this finding.')
 
         if is_active and is_risk_accepted:
             raise serializers.ValidationError('Active findings cannot '
@@ -1326,24 +1325,24 @@ class FindingCreateSerializer(TaggitSerializer, serializers.ModelSerializer):
         new_finding = super(TaggitSerializer, self).create(validated_data)
 
         if vulnerability_id_set:
-            vulnerability_ids = list()
-            for vulnerability_id in vulnerability_id_set:
-                vulnerability_ids.append(vulnerability_id['vulnerability_id'])
+            vulnerability_ids = [
+                vulnerability_id['vulnerability_id']
+                for vulnerability_id in vulnerability_id_set
+            ]
+
             validated_data['cve'] = vulnerability_ids[0]
             save_vulnerability_ids(new_finding, vulnerability_ids)
             new_finding.save()
 
-        # TODO: JIRA can we remove this is_push_all_issues, already checked in apiv2 viewset?
-        push_to_jira = push_to_jira or jira_helper.is_push_all_issues(new_finding)
-
-        # If we need to push to JIRA, an extra save call is needed.
-        # TODO try to combine create and save, but for now I'm just fixing a bug and don't want to change to much
-        if push_to_jira or new_finding:
+        if push_to_jira := push_to_jira or jira_helper.is_push_all_issues(
+            new_finding
+        ):
             new_finding.save(push_to_jira=push_to_jira)
 
-        # not sure why we are returning a tag_object, but don't want to change too much now as we're just fixing a bug
-        tag_object = self._save_tags(new_finding, to_be_tagged)
-        return tag_object
+        elif new_finding:
+            new_finding.save(push_to_jira=push_to_jira)
+
+        return self._save_tags(new_finding, to_be_tagged)
 
     def validate(self, data):
         if 'reporter' not in data:
@@ -1394,9 +1393,11 @@ class FindingTemplateSerializer(TaggitSerializer, serializers.ModelSerializer):
         new_finding_template = super(TaggitSerializer, self).create(validated_data)
 
         if vulnerability_id_set:
-            vulnerability_ids = list()
-            for vulnerability_id in vulnerability_id_set:
-                vulnerability_ids.append(vulnerability_id['vulnerability_id'])
+            vulnerability_ids = [
+                vulnerability_id['vulnerability_id']
+                for vulnerability_id in vulnerability_id_set
+            ]
+
             validated_data['cve'] = vulnerability_ids[0]
             save_vulnerability_ids_template(new_finding_template, vulnerability_ids)
             new_finding_template.save()
@@ -1407,10 +1408,13 @@ class FindingTemplateSerializer(TaggitSerializer, serializers.ModelSerializer):
         # Save vulnerability ids and pop them
         if 'vulnerability_id_template_set' in validated_data:
             vulnerability_id_set = validated_data.pop('vulnerability_id_template_set')
-            vulnerability_ids = list()
+            vulnerability_ids = []
             if vulnerability_id_set:
-                for vulnerability_id in vulnerability_id_set:
-                    vulnerability_ids.append(vulnerability_id['vulnerability_id'])
+                vulnerability_ids.extend(
+                    vulnerability_id['vulnerability_id']
+                    for vulnerability_id in vulnerability_id_set
+                )
+
             save_vulnerability_ids_template(instance, vulnerability_ids)
 
         return super(TaggitSerializer, self).update(instance, validated_data)
@@ -1577,12 +1581,16 @@ class ImportScanSerializer(serializers.Serializer):
         scan_type = data.get("scan_type")
         file = data.get("file")
         if not file and requires_file(scan_type):
-            raise serializers.ValidationError('Uploading a Report File is required for {}'.format(scan_type))
+            raise serializers.ValidationError(
+                f'Uploading a Report File is required for {scan_type}'
+            )
+
         if file and is_scan_file_too_large(file):
             raise serializers.ValidationError(
-                'Report file is too large. Maximum supported size is {} MB'.format(settings.SCAN_FILE_MAX_SIZE))
-        tool_type = requires_tool_type(scan_type)
-        if tool_type:
+                f'Report file is too large. Maximum supported size is {settings.SCAN_FILE_MAX_SIZE} MB'
+            )
+
+        if tool_type := requires_tool_type(scan_type):
             api_scan_configuration = data.get('api_scan_configuration')
             if api_scan_configuration and tool_type != api_scan_configuration.tool_configuration.tool_type.name:
                 raise serializers.ValidationError(f'API scan configuration must be of tool type {tool_type}')
@@ -1748,12 +1756,16 @@ class ReImportScanSerializer(TaggitSerializer, serializers.Serializer):
         scan_type = data.get("scan_type")
         file = data.get("file")
         if not file and requires_file(scan_type):
-            raise serializers.ValidationError('Uploading a Report File is required for {}'.format(scan_type))
+            raise serializers.ValidationError(
+                f'Uploading a Report File is required for {scan_type}'
+            )
+
         if file and is_scan_file_too_large(file):
             raise serializers.ValidationError(
-                'Report file is too large. Maximum supported size is {} MB'.format(settings.SCAN_FILE_MAX_SIZE))
-        tool_type = requires_tool_type(scan_type)
-        if tool_type:
+                f'Report file is too large. Maximum supported size is {settings.SCAN_FILE_MAX_SIZE} MB'
+            )
+
+        if tool_type := requires_tool_type(scan_type):
             api_scan_configuration = data.get('api_scan_configuration')
             if api_scan_configuration and tool_type != api_scan_configuration.tool_configuration.tool_type.name:
                 raise serializers.ValidationError(f'API scan configuration must be of tool type {tool_type}')
@@ -1789,7 +1801,9 @@ class EndpointMetaImporterSerializer(serializers.Serializer):
         file = data.get("file")
         if file and is_scan_file_too_large(file):
             raise serializers.ValidationError(
-                'Report file is too large. Maximum supported size is {} MB'.format(settings.SCAN_FILE_MAX_SIZE))
+                f'Report file is too large. Maximum supported size is {settings.SCAN_FILE_MAX_SIZE} MB'
+            )
+
 
         return data
 
@@ -1869,7 +1883,9 @@ class ImportLanguagesSerializer(serializers.Serializer):
     def validate(self, data):
         if is_scan_file_too_large(data['file']):
             raise serializers.ValidationError(
-                'File is too large. Maximum supported size is {} MB'.format(settings.SCAN_FILE_MAX_SIZE))
+                f'File is too large. Maximum supported size is {settings.SCAN_FILE_MAX_SIZE} MB'
+            )
+
         return data
 
 
@@ -1957,7 +1973,7 @@ class SystemSettingsSerializer(TaggitSerializer, serializers.ModelSerializer):
             default_group_role = data['default_group_role']
 
         if (default_group is None and default_group_role is not None) or \
-           (default_group is not None and default_group_role is None):
+               (default_group is not None and default_group_role is None):
             raise ValidationError('default_group and default_group_role must either both be set or both be empty.')
 
         return data

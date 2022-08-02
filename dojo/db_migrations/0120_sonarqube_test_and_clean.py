@@ -11,12 +11,14 @@ def sq_clean(apps, schema_editor):
     Tool_Type_model = apps.get_model('dojo', 'Tool_Type')
     tts = Tool_Type_model.objects.filter(name='SonarQube')
 
-    sqtc = Tool_Configuration_model.objects.filter(tool_type__in=tts).first()
-
-    if sqtc:
+    if sqtc := Tool_Configuration_model.objects.filter(
+        tool_type__in=tts
+    ).first():
         for sq in Sonarqube_Product_model.objects.filter(sonarqube_tool_config__isnull=True):
-            logger.info('Setting Product SonarQube Configuration for product {} to only existing SonarQube Tool '
-                        'Configuration'.format(sq.product.pk))
+            logger.info(
+                f'Setting Product SonarQube Configuration for product {sq.product.pk} to only existing SonarQube Tool Configuration'
+            )
+
             sq.sonarqube_tool_config = sqtc
             sq.save()
     else:

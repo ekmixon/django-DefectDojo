@@ -35,14 +35,11 @@ def get_prefetch_schema(methods, serializer):
 
 
 def _get_path_to_GET_serializer_map(generator):
-    path_to_GET_serializer = dict()
-    for path, path_pattern, method, view in generator._get_paths_and_endpoints():
-        # print(path, path_pattern, method, view)
-        if method == 'GET':
-            if hasattr(view, 'get_serializer_class'):
-                path_to_GET_serializer[path] = view.get_serializer_class()
-
-    return path_to_GET_serializer
+    return {
+        path: view.get_serializer_class()
+        for path, path_pattern, method, view in generator._get_paths_and_endpoints()
+        if method == 'GET' and hasattr(view, 'get_serializer_class')
+    }
 
 
 def prefetch_postprocessing_hook(result, generator, request, public):
@@ -76,8 +73,32 @@ def prefetch_postprocessing_hook(result, generator, request, public):
                     field_to_serializer = dict([(name, prefetcher._find_serializer(field_type)) for name, field_type in fields if prefetcher._find_serializer(field_type)])
                     fields_to_refname = dict([(name, utils.get_serializer_ref_name(serializer()))
                         for name, serializer in field_to_serializer.items()])
-                    properties = dict([(name, dict([("type", "object"), ("readOnly", True), ("additionalProperties", dict([("$ref", "#/components/schemas/" + fields_to_refname[name])]))]))
-                        for name in field_names])
+                    properties = dict(
+                        [
+                            (
+                                name,
+                                dict(
+                                    [
+                                        ("type", "object"),
+                                        ("readOnly", True),
+                                        (
+                                            "additionalProperties",
+                                            dict(
+                                                [
+                                                    (
+                                                        "$ref",
+                                                        f"#/components/schemas/{fields_to_refname[name]}",
+                                                    )
+                                                ]
+                                            ),
+                                        ),
+                                    ]
+                                ),
+                            )
+                            for name in field_names
+                        ]
+                    )
+
                     ref = paths[path]['get']['responses']['200']['content']['application/json']['schema']['$ref']
                     component_name = ref.split('/')[-1]
                     result['components']['schemas'][component_name]['properties']['prefetch'] = dict([("type", "object"), ("properties", properties)])

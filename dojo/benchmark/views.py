@@ -80,7 +80,6 @@ def benchmark_view(request, pid, type, cat=None):
     try:
         benchmark_product_summary = Benchmark_Product_Summary.objects.get(product=product, benchmark_type=benchmark_type)
     except:
-        pass
         benchmark_product_summary = Benchmark_Product_Summary(product=product, benchmark_type=benchmark_type)
         benchmark_product_summary.save()
 
@@ -141,18 +140,21 @@ def delete(request, pid, type):
     benchmark_product_summary = Benchmark_Product_Summary.objects.filter(product=product, benchmark_type=type).first()
     form = DeleteBenchmarkForm(instance=benchmark_product_summary)
 
-    if request.method == 'POST':
-        if 'id' in request.POST and str(benchmark_product_summary.id) == request.POST['id']:
-            form = DeleteBenchmarkForm(request.POST, instance=benchmark_product_summary)
-            if form.is_valid():
-                benchmark_product = Benchmark_Product.objects.filter(product=product, control__category__type=type)
-                benchmark_product.delete()
-                benchmark_product_summary.delete()
-                messages.add_message(request,
-                                     messages.SUCCESS,
-                                     'Benchmarks removed.',
-                                     extra_tags='alert-success')
-                return HttpResponseRedirect(reverse('product'))
+    if (
+        request.method == 'POST'
+        and 'id' in request.POST
+        and str(benchmark_product_summary.id) == request.POST['id']
+    ):
+        form = DeleteBenchmarkForm(request.POST, instance=benchmark_product_summary)
+        if form.is_valid():
+            benchmark_product = Benchmark_Product.objects.filter(product=product, control__category__type=type)
+            benchmark_product.delete()
+            benchmark_product_summary.delete()
+            messages.add_message(request,
+                                 messages.SUCCESS,
+                                 'Benchmarks removed.',
+                                 extra_tags='alert-success')
+            return HttpResponseRedirect(reverse('product'))
 
     product_tab = Product_Tab(product, title="Delete Benchmarks", tab="benchmarks")
     return render(request, 'dojo/delete_benchmark.html',

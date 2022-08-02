@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 class Migration(migrations.Migration):
 
-    def copy_existing_tags_to_tags_from_django_tagging_field(apps, schema_editor):
+    def copy_existing_tags_to_tags_from_django_tagging_field(self, schema_editor):
         # We can't import the models directly as it may be a newer
         # version than this migration expects. We use the historical version.
         logger.info('Migrating tags from django-tagging to django-tagulous step1. Enable DEBUG logging to find out more.')
         import tagulous.utils
         # for model_name in ['Product']:
         for model_name in ['Product', 'test', 'finding', 'engagement', 'endpoint', 'finding_template', 'app_Analysis', 'objects']:
-            model_class = apps.get_model('dojo', model_name)
+            model_class = self.get_model('dojo', model_name)
             # the get_model returns a fake class proxy, which is not registered with django-tagging
             tag_register(model_class)
 
@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
                     try:
                         if hasattr(obj, 'prod_type_id') and obj.prod_type_id == 0:
                             logger.warning('product found without product type (prod_type==0), changing to: "_tag migration lost and found" product type')
-                            Product_Type_Model = apps.get_model('dojo', 'Product_Type')
+                            Product_Type_Model = self.get_model('dojo', 'Product_Type')
                             prod_type_lost_and_found, created = Product_Type_Model.objects.get_or_create(name='_tag migration lost and found')
                             obj.prod_type = prod_type_lost_and_found
                             obj.save()
@@ -52,13 +52,13 @@ class Migration(migrations.Migration):
                         logger.error('Model to dict:')
                         logger.error(model_to_dict(obj))
 
-    def copy_tags_from_django_tagging_field_to_new_tagulous_tags_field(apps, schema_editor):
+    def copy_tags_from_django_tagging_field_to_new_tagulous_tags_field(self, schema_editor):
         # We can't import the models directly as it may be a newer
         # version than this migration expects. We use the historical version.
         logger.info('Migrating tags from django-tagging to django-tagulous step2. Enable DEBUG logging to find out more.')
         # for model_name in ['Product']:
         for model_name in ['Product', 'test', 'finding', 'engagement', 'endpoint', 'finding_template', 'app_Analysis', 'objects_product']:
-            model_class = apps.get_model('dojo', model_name)
+            model_class = self.get_model('dojo', model_name)
 
             for obj in model_class.objects.all():
                 # logger.debug('%s:%s:%s', model_class, obj.id, obj)

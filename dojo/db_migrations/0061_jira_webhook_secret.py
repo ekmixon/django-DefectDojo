@@ -9,8 +9,8 @@ class Migration(migrations.Migration):
         ('dojo', '0060_false_p_dedupe_indices'),
     ]
 
-    def disable_webhook_secret_for_existing_installs(apps, schema_editor):
-        system_settings = apps.get_model('dojo', 'system_settings')
+    def disable_webhook_secret_for_existing_installs(self, schema_editor):
+        system_settings = self.get_model('dojo', 'system_settings')
         try:
             # for existing install we disable the webhook security as we don't want to break those installs
             ss = system_settings.objects.all().first()

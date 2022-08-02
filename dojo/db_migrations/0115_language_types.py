@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
         ('dojo', '0114_cyclonedx_vuln_uniqu'),
     ]
 
-    def populate_language_types(apps, schema_editor):
+    def populate_language_types(self, schema_editor):
         call_command('loaddata', 'language_type')
 
     operations = [

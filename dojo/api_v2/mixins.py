@@ -36,10 +36,11 @@ class DeletePreviewModelMixin:
             {
                 "model": type(x).__name__,
                 "id": x.id if hasattr(x, 'id') else None,
-                "name": str(x) if not isinstance(x, Token) else "<APITokenIsHidden>"
+                "name": "<APITokenIsHidden>" if isinstance(x, Token) else str(x),
             }
             for x in flatten(rels)
         ]
+
 
         page = self.paginate_queryset(rels)
 

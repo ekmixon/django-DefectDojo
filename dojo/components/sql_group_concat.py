@@ -7,12 +7,14 @@ class Sql_GroupConcat(Aggregate):
 
     def __init__(self, expression, separator, distinct=False, ordering=None, **extra):
         self.separator = separator
-        super(Sql_GroupConcat, self).__init__(expression,
-                                              distinct='DISTINCT ' if distinct else '',
-                                              ordering=' ORDER BY %s' % ordering if ordering is not None else '',
-                                              separator=' SEPARATOR "%s"' % separator,
-                                              output_field=CharField(),
-                                              **extra)
+        super(Sql_GroupConcat, self).__init__(
+            expression,
+            distinct='DISTINCT ' if distinct else '',
+            ordering=f' ORDER BY {ordering}' if ordering is not None else '',
+            separator=' SEPARATOR "%s"' % separator,
+            output_field=CharField(),
+            **extra,
+        )
 
     def as_mysql(self, compiler, connection):
         return super().as_sql(compiler,

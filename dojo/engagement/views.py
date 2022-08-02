@@ -117,19 +117,12 @@ def get_filtered_engagements(request, view):
 
 
 def get_test_counts(engagements):
-    # Get the test counts per engagement. As a separate query, this is much
-    # faster than annotating the above `engagements` query.
-    engagement_test_counts = {
+    return {
         test['engagement']: test['test_count']
-        for test in Test.objects.filter(
-            engagement__in=engagements
-        ).values(
-            'engagement'
-        ).annotate(
-            test_count=Count('engagement')
-        )
+        for test in Test.objects.filter(engagement__in=engagements)
+        .values('engagement')
+        .annotate(test_count=Count('engagement'))
     }
-    return engagement_test_counts
 
 
 def engagements(request, view):
@@ -222,12 +215,21 @@ def edit_engagement(request, eid):
             # first save engagement details
             new_status = form.cleaned_data.get('status')
             engagement = form.save(commit=False)
-            if (new_status == "Cancelled" or new_status == "Completed"):
+            if new_status in ["Cancelled", "Completed"]:
                 engagement.active = False
-                create_notification(event='close_engagement',
-                        title='Closure of %s' % engagement.name,
-                        description='The engagement "%s" was closed' % (engagement.name),
-                        engagement=engagement, url=reverse('engagement_all_findings', args=(engagement.id, ))),
+                (
+                    create_notification(
+                        event='close_engagement',
+                        title=f'Closure of {engagement.name}',
+                        description='The engagement "%s" was closed'
+                        % (engagement.name),
+                        engagement=engagement,
+                        url=reverse(
+                            'engagement_all_findings', args=(engagement.id,)
+                        ),
+                    ),
+                )
+
             else:
                 engagement.active = True
             engagement.save()
@@ -265,11 +267,7 @@ def edit_engagement(request, eid):
             logger.debug('showing jira-epic-form')
             jira_epic_form = JIRAEngagementForm(instance=engagement)
 
-    if is_ci_cd:
-        title = 'Edit CI/CD Engagement'
-    else:
-        title = 'Edit Interactive Engagement'
-
+    title = 'Edit CI/CD Engagement' if is_ci_cd else 'Edit Interactive Engagement'
     product_tab = Product_Tab(engagement.product, title=title, tab="engagements")
     product_tab.setEngagement(engagement)
     return render(request, 'dojo/new_eng.html', {
@@ -289,36 +287,44 @@ def delete_engagement(request, eid):
     product = engagement.product
     form = DeleteEngagementForm(instance=engagement)
 
-    if request.method == 'POST':
-        if 'id' in request.POST and str(engagement.id) == request.POST['id']:
-            form = DeleteEngagementForm(request.POST, instance=engagement)
-            if form.is_valid():
-                product = engagement.product
-                if get_setting("ASYNC_OBJECT_DELETE"):
-                    async_del = async_delete()
-                    async_del.delete(engagement)
-                    message = 'Engagement and relationships will be removed in the background.'
-                else:
-                    message = 'Engagement and relationships removed.'
-                    engagement.delete()
-                messages.add_message(
-                    request,
-                    messages.SUCCESS,
-                    message,
-                    extra_tags='alert-success')
-                create_notification(event='other',
-                                    title='Deletion of %s' % engagement.name,
-                                    product=product,
-                                    description='The engagement "%s" was deleted by %s' % (engagement.name, request.user),
-                                    url=request.build_absolute_uri(reverse('view_engagements', args=(product.id, ))),
-                                    recipients=[engagement.lead],
-                                    icon="exclamation-triangle")
+    if (
+        request.method == 'POST'
+        and 'id' in request.POST
+        and str(engagement.id) == request.POST['id']
+    ):
+        form = DeleteEngagementForm(request.POST, instance=engagement)
+        if form.is_valid():
+            product = engagement.product
+            if get_setting("ASYNC_OBJECT_DELETE"):
+                async_del = async_delete()
+                async_del.delete(engagement)
+                message = 'Engagement and relationships will be removed in the background.'
+            else:
+                message = 'Engagement and relationships removed.'
+                engagement.delete()
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                message,
+                extra_tags='alert-success')
+            create_notification(
+                event='other',
+                title=f'Deletion of {engagement.name}',
+                product=product,
+                description='The engagement "%s" was deleted by %s'
+                % (engagement.name, request.user),
+                url=request.build_absolute_uri(
+                    reverse('view_engagements', args=(product.id,))
+                ),
+                recipients=[engagement.lead],
+                icon="exclamation-triangle",
+            )
 
-                return HttpResponseRedirect(reverse("view_engagements", args=(product.id, )))
+
+            return HttpResponseRedirect(reverse("view_engagements", args=(product.id, )))
 
     rels = ['Previewing the relationships has been disabled.', '']
-    display_preview = get_setting('DELETE_PREVIEW')
-    if display_preview:
+    if display_preview := get_setting('DELETE_PREVIEW'):
         collector = NestedObjects(using=DEFAULT_DB_ALIAS)
         collector.collect([engagement])
         rels = collector.nested()
@@ -361,7 +367,6 @@ def view_engagement(request, eid):
         check = Check_List.objects.get(engagement=eng)
     except:
         check = None
-        pass
     notes = eng.notes.all()
     note_type_activation = Note_Type.objects.filter(is_active=True).count()
     if note_type_activation:
@@ -373,10 +378,14 @@ def view_engagement(request, eid):
         eng.progress = 'check_list'
         eng.save()
 
-        if note_type_activation:
-            form = TypedNoteForm(request.POST, available_note_types=available_note_types)
-        else:
-            form = NoteForm(request.POST)
+        form = (
+            TypedNoteForm(
+                request.POST, available_note_types=available_note_types
+            )
+            if note_type_activation
+            else NoteForm(request.POST)
+        )
+
         if form.is_valid():
             new_note = form.save(commit=False)
             new_note.author = request.user
@@ -388,16 +397,15 @@ def view_engagement(request, eid):
             else:
                 form = NoteForm()
             url = request.build_absolute_uri(reverse("view_engagement", args=(eng.id,)))
-            title = "Engagement: %s on %s" % (eng.name, eng.product.name)
+            title = f"Engagement: {eng.name} on {eng.product.name}"
             messages.add_message(request,
                                  messages.SUCCESS,
                                  'Note added successfully.',
                                  extra_tags='alert-success')
+    elif note_type_activation:
+        form = TypedNoteForm(available_note_types=available_note_types)
     else:
-        if note_type_activation:
-            form = TypedNoteForm(available_note_types=available_note_types)
-        else:
-            form = NoteForm()
+        form = NoteForm()
 
     creds = Cred_Mapping.objects.filter(
         product=eng.product).select_related('cred_id').order_by('cred_id')
@@ -406,10 +414,11 @@ def view_engagement(request, eid):
 
     add_breadcrumb(parent=eng, top_level=False, request=request)
 
-    title = ""
-    if eng.engagement_type == "CI/CD":
-        title = " CI/CD"
-    product_tab = Product_Tab(prod, title="View" + title + " Engagement", tab="engagements")
+    title = " CI/CD" if eng.engagement_type == "CI/CD" else ""
+    product_tab = Product_Tab(
+        prod, title=f"View{title} Engagement", tab="engagements"
+    )
+
     product_tab.setEngagement(eng)
     return render(
         request, 'dojo/view_eng.html', {
@@ -435,8 +444,7 @@ def view_engagement(request, eid):
 
 def prefetch_for_view_tests(tests):
     prefetched = tests
-    if isinstance(tests,
-                  QuerySet):  # old code can arrive here with prods being a list because the query was already executed
+    if isinstance(prefetched, QuerySet):  # old code can arrive here with prods being a list because the query was already executed
 
         prefetched = prefetched.select_related('lead')
         prefetched = prefetched.prefetch_related('tags', 'test_type', 'notes')
@@ -474,8 +482,6 @@ def add_tests(request, eid):
                 new_test.lead = User.objects.get(id=form['lead'].value())
             except:
                 new_test.lead = None
-                pass
-
             # Set status to in progress if a test is added
             if eng.status != "In Progress" and eng.active is True:
                 eng.status = "In Progress"
@@ -484,17 +490,16 @@ def add_tests(request, eid):
             new_test.save()
 
             # Save the credential to the test
-            if cred_form.is_valid():
-                if cred_form.cleaned_data['cred_user']:
-                    # Select the credential mapping object from the selected list and only allow if the credential is associated with the product
-                    cred_user = Cred_Mapping.objects.filter(
-                        pk=cred_form.cleaned_data['cred_user'].id,
-                        engagement=eid).first()
+            if cred_form.is_valid() and cred_form.cleaned_data['cred_user']:
+                # Select the credential mapping object from the selected list and only allow if the credential is associated with the product
+                cred_user = Cred_Mapping.objects.filter(
+                    pk=cred_form.cleaned_data['cred_user'].id,
+                    engagement=eid).first()
 
-                    new_f = cred_form.save(commit=False)
-                    new_f.test = new_test
-                    new_f.cred_id = cred_user.cred_id
-                    new_f.save()
+                new_f = cred_form.save(commit=False)
+                new_f.test = new_test
+                new_f.cred_id = cred_user.cred_id
+                new_f.save()
 
             messages.add_message(
                 request,

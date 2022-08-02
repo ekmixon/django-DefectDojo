@@ -34,8 +34,8 @@ def action_history(request, cid, oid):
 
     if ct.model == "product":
         user_has_permission_or_403(request.user, obj, Permissions.Product_View)
-        product_id = obj.id
         active_tab = "overview"
+        product_id = obj.id
         object_value = Product.objects.get(id=obj.id)
     elif ct.model == "engagement":
         user_has_permission_or_403(request.user, obj, Permissions.Engagement_View)
@@ -61,18 +61,19 @@ def action_history(request, cid, oid):
         active_tab = "endpoints"
     elif ct.model == "risk_acceptance":
         engagements = Engagement.objects.filter(risk_acceptance=obj)
-        authorized = False
-        for engagement in engagements:
-            if user_has_permission(request.user, engagement, Permissions.Engagement_View):
-                authorized = True
-                break
+        authorized = any(
+            user_has_permission(
+                request.user, engagement, Permissions.Engagement_View
+            )
+            for engagement in engagements
+        )
+
         if not authorized:
             raise PermissionDenied
     elif ct.model == "user":
         user_has_configuration_permission_or_403(request.user, 'auth.view_user', legacy='superuser')
-    else:
-        if not request.user.is_superuser:
-            raise PermissionDenied
+    elif not request.user.is_superuser:
+        raise PermissionDenied
 
     product_tab = None
     if product_id:

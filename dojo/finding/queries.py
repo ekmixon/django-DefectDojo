@@ -13,11 +13,7 @@ def get_authorized_findings(permission, queryset=None, user=None):
     if user is None:
         return Finding.objects.none()
 
-    if queryset is None:
-        findings = Finding.objects.all()
-    else:
-        findings = queryset
-
+    findings = Finding.objects.all() if queryset is None else queryset
     if user.is_superuser:
         return findings
 

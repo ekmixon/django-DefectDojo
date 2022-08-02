@@ -49,15 +49,9 @@ def process_endpoints_view(request, host_view=False, vulnerable=False):
 
     paged_endpoints = get_page_items(request, endpoints.qs, 25)
 
-    if vulnerable:
-        view_name = "Vulnerable"
-    else:
-        view_name = "All"
-
-    if host_view:
-        view_name += " Hosts"
-    else:
-        view_name += " Endpoints"
+    view_name = ("Vulnerable" if vulnerable else "All") + (
+        " Hosts" if host_view else " Endpoints"
+    )
 
     add_breadcrumb(title=view_name, top_level=not len(request.GET), request=request)
 
@@ -84,12 +78,11 @@ def get_endpoint_ids(endpoints):
     hosts = []
     ids = []
     for e in endpoints:
-        key = e.host + '-' + str(e.product.id)
+        key = f'{e.host}-{str(e.product.id)}'
         if key in hosts:
             continue
-        else:
-            hosts.append(key)
-            ids.append(e.id)
+        hosts.append(key)
+        ids.append(e.id)
     return ids
 
 
@@ -142,11 +135,7 @@ def process_endpoint_view(request, eid, host_view=False):
 
     paged_findings = get_page_items(request, active_findings, 25)
 
-    vulnerable = False
-
-    if active_findings.count() != 0:
-        vulnerable = True
-
+    vulnerable = active_findings.count() != 0
     product_tab = Product_Tab(endpoint.product, "Host" if host_view else "Endpoint", tab="endpoints")
     return render(request,
                   "dojo/view_endpoint.html",
@@ -206,23 +195,30 @@ def delete_endpoint(request, eid):
     product = endpoint.product
     form = DeleteEndpointForm(instance=endpoint)
 
-    if request.method == 'POST':
-        if 'id' in request.POST and str(endpoint.id) == request.POST['id']:
-            form = DeleteEndpointForm(request.POST, instance=endpoint)
-            if form.is_valid():
-                product = endpoint.product
-                endpoint.delete()
-                messages.add_message(request,
-                                     messages.SUCCESS,
-                                     'Endpoint and relationships removed.',
-                                     extra_tags='alert-success')
-                create_notification(event='other',
-                                    title='Deletion of %s' % endpoint,
-                                    product=product,
-                                    description='The endpoint "%s" was deleted by %s' % (endpoint, request.user),
-                                    url=request.build_absolute_uri(reverse('endpoint')),
-                                    icon="exclamation-triangle")
-                return HttpResponseRedirect(reverse('view_product', args=(product.id,)))
+    if (
+        request.method == 'POST'
+        and 'id' in request.POST
+        and str(endpoint.id) == request.POST['id']
+    ):
+        form = DeleteEndpointForm(request.POST, instance=endpoint)
+        if form.is_valid():
+            product = endpoint.product
+            endpoint.delete()
+            messages.add_message(request,
+                                 messages.SUCCESS,
+                                 'Endpoint and relationships removed.',
+                                 extra_tags='alert-success')
+            create_notification(
+                event='other',
+                title=f'Deletion of {endpoint}',
+                product=product,
+                description='The endpoint "%s" was deleted by %s'
+                % (endpoint, request.user),
+                url=request.build_absolute_uri(reverse('endpoint')),
+                icon="exclamation-triangle",
+            )
+
+            return HttpResponseRedirect(reverse('view_product', args=(product.id,)))
 
     collector = NestedObjects(using=DEFAULT_DB_ALIAS)
     collector.collect([endpoint])
@@ -281,7 +277,10 @@ def add_product_endpoint(request):
                                  messages.SUCCESS,
                                  'Endpoint added successfully.',
                                  extra_tags='alert-success')
-            return HttpResponseRedirect(reverse('endpoint') + "?product=%s" % form.product.id)
+            return HttpResponseRedirect(
+                reverse('endpoint') + f"?product={form.product.id}"
+            )
+
     add_breadcrumb(title="Add Endpoint", top_level=False, request=request)
     return render(request,
                   'dojo/add_endpoint.html',
@@ -328,8 +327,7 @@ def edit_meta_data(request, eid):
                 cfv_id = int(key.split('_')[1])
                 cfv = get_object_or_404(DojoMeta, id=cfv_id)
 
-                value = value.strip()
-                if value:
+                if value := value.strip():
                     cfv.value = value
                     cfv.save()
             if key.startswith('delete_'):
@@ -375,46 +373,56 @@ def endpoint_bulk_update_all(request, pid=None):
                 calculate_grade(prod)
 
             if skipped_endpoint_count > 0:
-                add_error_message_to_response('Skipped deletion of {} endpoints because you are not authorized.'.format(skipped_endpoint_count))
-
-            if deleted_endpoint_count > 0:
-                messages.add_message(request,
-                    messages.SUCCESS,
-                    'Bulk delete of {} endpoints was successful.'.format(deleted_endpoint_count),
-                    extra_tags='alert-success')
-        else:
-            if endpoints_to_update:
-
-                if pid is not None:
-                    product = get_object_or_404(Product, id=pid)
-                    user_has_permission_or_403(request.user, product, Permissions.Finding_Edit)
-
-                endpoints = get_authorized_endpoints(Permissions.Endpoint_Edit, endpoints, request.user)
-
-                skipped_endpoint_count = total_endpoint_count - endpoints.count()
-                updated_endpoint_count = endpoints.count()
-
-                if skipped_endpoint_count > 0:
-                    add_error_message_to_response('Skipped mitigation of {} endpoints because you are not authorized.'.format(skipped_endpoint_count))
-
-                eps_count = Endpoint_Status.objects.filter(endpoint__in=endpoints).update(
-                    mitigated=True,
-                    mitigated_by=request.user,
-                    mitigated_time=timezone.now(),
-                    last_modified=timezone.now()
+                add_error_message_to_response(
+                    f'Skipped deletion of {skipped_endpoint_count} endpoints because you are not authorized.'
                 )
 
-                if updated_endpoint_count > 0:
-                    messages.add_message(request,
-                                        messages.SUCCESS,
-                                        'Bulk mitigation of {} endpoints ({} endpoint statuses) was successful.'.format(
-                                            updated_endpoint_count, eps_count),
-                                        extra_tags='alert-success')
-            else:
-                messages.add_message(request,
-                                     messages.ERROR,
-                                     'Unable to process bulk update. Required fields were not selected.',
-                                     extra_tags='alert-danger')
+
+            if deleted_endpoint_count > 0:
+                messages.add_message(
+                    request,
+                    messages.SUCCESS,
+                    f'Bulk delete of {deleted_endpoint_count} endpoints was successful.',
+                    extra_tags='alert-success',
+                )
+
+        elif endpoints_to_update:
+
+            if pid is not None:
+                product = get_object_or_404(Product, id=pid)
+                user_has_permission_or_403(request.user, product, Permissions.Finding_Edit)
+
+            endpoints = get_authorized_endpoints(Permissions.Endpoint_Edit, endpoints, request.user)
+
+            skipped_endpoint_count = total_endpoint_count - endpoints.count()
+            updated_endpoint_count = endpoints.count()
+
+            if skipped_endpoint_count > 0:
+                add_error_message_to_response(
+                    f'Skipped mitigation of {skipped_endpoint_count} endpoints because you are not authorized.'
+                )
+
+
+            eps_count = Endpoint_Status.objects.filter(endpoint__in=endpoints).update(
+                mitigated=True,
+                mitigated_by=request.user,
+                mitigated_time=timezone.now(),
+                last_modified=timezone.now()
+            )
+
+            if updated_endpoint_count > 0:
+                messages.add_message(
+                    request,
+                    messages.SUCCESS,
+                    f'Bulk mitigation of {updated_endpoint_count} endpoints ({eps_count} endpoint statuses) was successful.',
+                    extra_tags='alert-success',
+                )
+
+        else:
+            messages.add_message(request,
+                                 messages.ERROR,
+                                 'Unable to process bulk update. Required fields were not selected.',
+                                 extra_tags='alert-danger')
     return HttpResponseRedirect(reverse('endpoint', args=()))
 
 
@@ -426,7 +434,7 @@ def endpoint_status_bulk_update(request, fid):
         status_list = ['active', 'false_positive', 'mitigated', 'out_of_scope', 'risk_accepted']
         enable = [item for item in status_list if item in list(post.keys())]
 
-        if endpoints_to_update and len(enable) > 0:
+        if endpoints_to_update and enable:
             endpoints = Endpoint.objects.filter(id__in=endpoints_to_update).order_by("endpoint_meta__product__id")
             for endpoint in endpoints:
                 endpoint_status = Endpoint_Status.objects.get(
@@ -491,8 +499,10 @@ def import_endpoint_meta(request, pid):
                 messages.add_message(
                     request,
                     messages.ERROR,
-                    "Report file is too large. Maximum supported size is {} MB".format(settings.SCAN_FILE_MAX_SIZE),
-                    extra_tags='alert-danger')
+                    f"Report file is too large. Maximum supported size is {settings.SCAN_FILE_MAX_SIZE} MB",
+                    extra_tags='alert-danger',
+                )
+
 
             create_endpoints = form.cleaned_data['create_endpoints']
             create_tags = form.cleaned_data['create_tags']
@@ -502,7 +512,10 @@ def import_endpoint_meta(request, pid):
                 endpoint_meta_import(file, product, create_endpoints, create_tags, create_dojo_meta, origin='UI', request=request)
             except Exception as e:
                 logger.exception(e)
-                add_error_message_to_response('An exception error occurred during the report import:%s' % str(e))
+                add_error_message_to_response(
+                    f'An exception error occurred during the report import:{str(e)}'
+                )
+
             return HttpResponseRedirect(reverse('endpoint') + "?product=" + pid)
 
     add_breadcrumb(title="Endpoint Meta Importer", top_level=False, request=request)

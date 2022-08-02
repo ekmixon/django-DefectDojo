@@ -27,7 +27,7 @@ def populate_last_status_update(apps, schema_editor):
     batch = []
     last_id = 0
     total_pages = (total_count // page_size) + 2
-    for p in range(1, total_pages):
+    for _ in range(1, total_pages):
         page = findings.filter(id__gt=last_id)[:page_size]
         for find in page:
             i += 1
@@ -38,11 +38,7 @@ def populate_last_status_update(apps, schema_editor):
             # for existing findings this should not be 'now'.
             # only valid value would be from miti   gated, otherwise we set it to None
             # to avoid code relying on it while the value is not reliable
-            if find.is_Mitigated:
-                find.last_status_update = find.mitigated
-            else:
-                find.last_status_update = None
-
+            find.last_status_update = find.mitigated if find.is_Mitigated else None
             batch.append(find)
 
             if (i > 0 and i % page_size == 0):

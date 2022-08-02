@@ -44,7 +44,7 @@ def log_me_0090(apps, schema_editor):
 
 
 def update_collation(apps, schema_editor):
-    print('Database vendor: {}'.format(schema_editor.connection.vendor))
+    print(f'Database vendor: {schema_editor.connection.vendor}')
     if not schema_editor.connection.vendor.startswith('mysql'):
         return
     schema_editor.execute('ALTER TABLE dojo_sonarqube_issue CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_bin')

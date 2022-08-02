@@ -28,22 +28,29 @@ def add_alerts(self, runinterval):
 
     upcoming_engagements = Engagement.objects.filter(target_start__gt=now + timedelta(days=3), target_start__lt=now + timedelta(days=3) + runinterval).order_by('target_start')
     for engagement in upcoming_engagements:
-        create_notification(event='upcoming_engagement',
-                            title='Upcoming engagement: %s' % engagement.name,
-                            engagement=engagement,
-                            recipients=[engagement.lead],
-                            url=reverse('view_engagement', args=(engagement.id,)))
+        create_notification(
+            event='upcoming_engagement',
+            title=f'Upcoming engagement: {engagement.name}',
+            engagement=engagement,
+            recipients=[engagement.lead],
+            url=reverse('view_engagement', args=(engagement.id,)),
+        )
+
 
     stale_engagements = Engagement.objects.filter(
         target_start__gt=now - runinterval,
         target_end__lt=now,
         status='In Progress').order_by('-target_end')
     for eng in stale_engagements:
-        create_notification(event='stale_engagement',
-                            title='Stale Engagement: %s' % eng.name,
-                            description='The engagement "%s" is stale. Target end was %s.' % (eng.name, eng.target_end.strftime("%b. %d, %Y")),
-                            url=reverse('view_engagement', args=(eng.id,)),
-                            recipients=[eng.lead])
+        create_notification(
+            event='stale_engagement',
+            title=f'Stale Engagement: {eng.name}',
+            description='The engagement "%s" is stale. Target end was %s.'
+            % (eng.name, eng.target_end.strftime("%b. %d, %Y")),
+            url=reverse('view_engagement', args=(eng.id,)),
+            recipients=[eng.lead],
+        )
+
 
     system_settings = System_Settings.objects.get()
     if system_settings.engagement_auto_close:
@@ -126,7 +133,10 @@ def async_dupe_delete(*args, **kwargs):
             dupe_count = len(duplicate_list) - dupe_max
 
             for finding in duplicate_list:
-                deduplicationLogger.debug('deleting finding {}:{} ({}))'.format(finding.id, finding.title, finding.hash_code))
+                deduplicationLogger.debug(
+                    f'deleting finding {finding.id}:{finding.title} ({finding.hash_code}))'
+                )
+
                 finding.delete()
                 total_deleted_count += 1
                 dupe_count -= 1
@@ -154,7 +164,7 @@ def async_sla_compute_and_notify_task(*args, **kwargs):
         if system_settings.enable_finding_sla:
             sla_compute_and_notify(*args, **kwargs)
     except Exception as e:
-        logger.error("An unexpected error was thrown calling the SLA code: {}".format(e))
+        logger.error(f"An unexpected error was thrown calling the SLA code: {e}")
 
 
 @app.task

@@ -56,9 +56,7 @@ class OktaOAuth2(OktaMixin, BaseOAuth2):
         """Loads user data from Okta"""
         return self.get_json(
             self._url('v1/userinfo'),
-            headers={
-                'Authorization': 'Bearer %s' % access_token,
-            }
+            headers={'Authorization': f'Bearer {access_token}'},
         )
 
 
@@ -88,8 +86,6 @@ class OktaOpenIdConnect(OktaOAuth2, OpenIdConnectAuth):
             except JWTError as e:
                 if k is None and client_id == 'a-key':
                     k = self.get_jwks_keys()[0]
-                pass
-
             claims = jwt.decode(
                 id_token,
                 k,

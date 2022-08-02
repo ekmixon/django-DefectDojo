@@ -15,7 +15,10 @@ from dojo.authorization.roles_permissions import Permissions
 def check_post_permission(request, post_model, post_pk, post_permission):
     if request.method == 'POST':
         if request.data.get(post_pk) is None:
-            raise ParseError('Unable to check for permissions: Attribute \'{}\' is required'.format(post_pk))
+            raise ParseError(
+                f"Unable to check for permissions: Attribute \'{post_pk}\' is required"
+            )
+
         object = get_object_or_404(post_model, pk=request.data.get(post_pk))
         return user_has_permission(request.user, object, post_permission)
     else:
@@ -25,7 +28,7 @@ def check_post_permission(request, post_model, post_pk, post_permission):
 def check_object_permission(request, object, get_permission, put_permission, delete_permission, post_permission=None):
     if request.method == 'GET':
         return user_has_permission(request.user, object, get_permission)
-    elif request.method == 'PUT' or request.method == 'PATCH':
+    elif request.method in ['PUT', 'PATCH']:
         return user_has_permission(request.user, object, put_permission)
     elif request.method == 'DELETE':
         return user_has_permission(request.user, object, delete_permission)
@@ -71,41 +74,34 @@ class UserHasDojoGroupMemberPermission(permissions.BasePermission):
 
 class UserHasDojoMetaPermission(permissions.BasePermission):
     def has_permission(self, request, view):
-        if request.method == 'POST':
-            has_permission_result = True
-            product_id = request.data.get('product', None)
-            if product_id:
-                object = get_object_or_404(Product, pk=product_id)
-                has_permission_result = has_permission_result and \
-                    user_has_permission(request.user, object, Permissions.Product_Edit)
-            finding_id = request.data.get('finding', None)
-            if finding_id:
-                object = get_object_or_404(Finding, pk=finding_id)
-                has_permission_result = has_permission_result and \
-                    user_has_permission(request.user, object, Permissions.Finding_Edit)
-            endpoint_id = request.data.get('endpoint', None)
-            if endpoint_id:
-                object = get_object_or_404(Endpoint, pk=endpoint_id)
-                has_permission_result = has_permission_result and \
-                    user_has_permission(request.user, object, Permissions.Endpoint_Edit)
-            return has_permission_result
-        else:
+        if request.method != 'POST':
             return True
+        has_permission_result = True
+        if product_id := request.data.get('product', None):
+            object = get_object_or_404(Product, pk=product_id)
+            has_permission_result = has_permission_result and \
+                    user_has_permission(request.user, object, Permissions.Product_Edit)
+        if finding_id := request.data.get('finding', None):
+            object = get_object_or_404(Finding, pk=finding_id)
+            has_permission_result = has_permission_result and \
+                    user_has_permission(request.user, object, Permissions.Finding_Edit)
+        if endpoint_id := request.data.get('endpoint', None):
+            object = get_object_or_404(Endpoint, pk=endpoint_id)
+            has_permission_result = has_permission_result and \
+                    user_has_permission(request.user, object, Permissions.Endpoint_Edit)
+        return has_permission_result
 
     def has_object_permission(self, request, view, obj):
         has_permission_result = True
-        product = obj.product
-        if product:
+        if product := obj.product:
             has_permission_result = has_permission_result and \
-                check_object_permission(request, product, Permissions.Product_View, Permissions.Product_Edit, Permissions.Product_Edit)
-        finding = obj.finding
-        if finding:
+                    check_object_permission(request, product, Permissions.Product_View, Permissions.Product_Edit, Permissions.Product_Edit)
+        if finding := obj.finding:
             has_permission_result = has_permission_result and \
-                check_object_permission(request, finding, Permissions.Finding_View, Permissions.Finding_Edit, Permissions.Finding_Edit)
-        endpoint = obj.endpoint
-        if endpoint:
+                    check_object_permission(request, finding, Permissions.Finding_View, Permissions.Finding_Edit, Permissions.Finding_Edit)
+        if endpoint := obj.endpoint:
             has_permission_result = has_permission_result and \
-                check_object_permission(request, endpoint, Permissions.Endpoint_View, Permissions.Endpoint_Edit, Permissions.Endpoint_Edit)
+                    check_object_permission(request, endpoint, Permissions.Endpoint_View, Permissions.Endpoint_Edit, Permissions.Endpoint_Edit)
         return has_permission_result
 
 
@@ -141,7 +137,7 @@ class UserHasEngagementPermission(permissions.BasePermission):
 
     def has_permission(self, request, view):
         if UserHasEngagementPermission.path_engagement_post.match(request.path) or \
-           UserHasEngagementPermission.path_engagement.match(request.path):
+               UserHasEngagementPermission.path_engagement.match(request.path):
             return check_post_permission(request, Product, 'product', Permissions.Engagement_Add)
         else:
             # related object only need object permission
@@ -149,7 +145,7 @@ class UserHasEngagementPermission(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         if UserHasEngagementPermission.path_engagement_post.match(request.path) or \
-           UserHasEngagementPermission.path_engagement.match(request.path):
+               UserHasEngagementPermission.path_engagement.match(request.path):
             return check_object_permission(request, obj, Permissions.Engagement_View, Permissions.Engagement_Edit, Permissions.Engagement_Delete)
         else:
             return check_object_permission(request, obj, Permissions.Engagement_View, Permissions.Engagement_Edit, Permissions.Engagement_Edit, Permissions.Engagement_Edit)
@@ -165,9 +161,9 @@ class UserHasFindingPermission(permissions.BasePermission):
 
     def has_permission(self, request, view):
         if UserHasFindingPermission.path_finding_post.match(request.path) or \
-           UserHasFindingPermission.path_finding.match(request.path) or \
-           UserHasFindingPermission.path_stub_finding_post.match(request.path) or \
-           UserHasFindingPermission.path_stub_finding.match(request.path):
+               UserHasFindingPermission.path_finding.match(request.path) or \
+               UserHasFindingPermission.path_stub_finding_post.match(request.path) or \
+               UserHasFindingPermission.path_stub_finding.match(request.path):
             return check_post_permission(request, Test, 'test', Permissions.Finding_Add)
         else:
             # related object only need object permission
@@ -175,9 +171,9 @@ class UserHasFindingPermission(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         if UserHasFindingPermission.path_finding_post.match(request.path) or \
-           UserHasFindingPermission.path_finding.match(request.path) or \
-           UserHasFindingPermission.path_stub_finding_post.match(request.path) or \
-           UserHasFindingPermission.path_stub_finding.match(request.path):
+               UserHasFindingPermission.path_finding.match(request.path) or \
+               UserHasFindingPermission.path_stub_finding_post.match(request.path) or \
+               UserHasFindingPermission.path_stub_finding.match(request.path):
             return check_object_permission(request, obj, Permissions.Finding_View, Permissions.Finding_Edit, Permissions.Finding_Delete)
         else:
             return check_object_permission(request, obj, Permissions.Finding_View, Permissions.Finding_Edit, Permissions.Finding_Edit, Permissions.Finding_Edit)
@@ -291,9 +287,9 @@ class UserHasReimportPermission(permissions.BasePermission):
         product_type = get_target_product_type_if_exists(product_type_name)
         product = get_target_product_if_exists(product_name, product_type_name)
         engagement = get_target_engagement_if_exists(None, engagement_name, product)
-        test = get_target_test_if_exists(test_id, test_title, scan_type, engagement)
-
-        if test:
+        if test := get_target_test_if_exists(
+            test_id, test_title, scan_type, engagement
+        ):
             # existing test, nothing special to check
             return user_has_permission(request.user, test, Permissions.Import_Scan_Result)
         elif test_id:
@@ -317,7 +313,7 @@ class UserHasTestPermission(permissions.BasePermission):
 
     def has_permission(self, request, view):
         if UserHasTestPermission.path_tests_post.match(request.path) or \
-           UserHasTestPermission.path_tests.match(request.path):
+               UserHasTestPermission.path_tests.match(request.path):
             return check_post_permission(request, Engagement, 'engagement', Permissions.Test_Add)
         else:
             # related object only need object permission
@@ -325,7 +321,7 @@ class UserHasTestPermission(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         if UserHasTestPermission.path_tests_post.match(request.path) or \
-           UserHasTestPermission.path_tests.match(request.path):
+               UserHasTestPermission.path_tests.match(request.path):
             return check_object_permission(request, obj, Permissions.Test_View, Permissions.Test_Edit, Permissions.Test_Delete)
         else:
             return check_object_permission(request, obj, Permissions.Test_View, Permissions.Test_Edit, Permissions.Test_Edit, Permissions.Test_Edit)
@@ -357,72 +353,60 @@ class UserHasProductAPIScanConfigurationPermission(permissions.BasePermission):
 
 class UserHasJiraProductPermission(permissions.BasePermission):
     def has_permission(self, request, view):
-        if request.method == 'POST':
-            has_permission_result = True
-            engagement_id = request.data.get('engagement', None)
-            if engagement_id:
-                object = get_object_or_404(Engagement, pk=engagement_id)
-                has_permission_result = has_permission_result and \
-                    user_has_permission(request.user, object, Permissions.Engagement_Edit)
-            product_id = request.data.get('product', None)
-            if product_id:
-                object = get_object_or_404(Product, pk=product_id)
-                has_permission_result = has_permission_result and \
-                    user_has_permission(request.user, object, Permissions.Product_Edit)
-            return has_permission_result
-        else:
+        if request.method != 'POST':
             return True
+        has_permission_result = True
+        if engagement_id := request.data.get('engagement', None):
+            object = get_object_or_404(Engagement, pk=engagement_id)
+            has_permission_result = has_permission_result and \
+                    user_has_permission(request.user, object, Permissions.Engagement_Edit)
+        if product_id := request.data.get('product', None):
+            object = get_object_or_404(Product, pk=product_id)
+            has_permission_result = has_permission_result and \
+                    user_has_permission(request.user, object, Permissions.Product_Edit)
+        return has_permission_result
 
     def has_object_permission(self, request, view, obj):
         has_permission_result = True
-        engagement = obj.engagement
-        if engagement:
+        if engagement := obj.engagement:
             has_permission_result = has_permission_result and \
-                check_object_permission(request, engagement, Permissions.Engagement_View, Permissions.Engagement_Edit, Permissions.Engagement_Edit)
-        product = obj.product
-        if product:
+                    check_object_permission(request, engagement, Permissions.Engagement_View, Permissions.Engagement_Edit, Permissions.Engagement_Edit)
+        if product := obj.product:
             has_permission_result = has_permission_result and \
-                check_object_permission(request, product, Permissions.Product_View, Permissions.Product_Edit, Permissions.Product_Edit)
+                    check_object_permission(request, product, Permissions.Product_View, Permissions.Product_Edit, Permissions.Product_Edit)
         return has_permission_result
 
 
 class UserHasJiraIssuePermission(permissions.BasePermission):
     def has_permission(self, request, view):
-        if request.method == 'POST':
-            has_permission_result = True
-            engagement_id = request.data.get('engagement', None)
-            if engagement_id:
-                object = get_object_or_404(Engagement, pk=engagement_id)
-                has_permission_result = has_permission_result and \
-                    user_has_permission(request.user, object, Permissions.Engagement_Edit)
-            finding_id = request.data.get('finding', None)
-            if finding_id:
-                object = get_object_or_404(Finding, pk=finding_id)
-                has_permission_result = has_permission_result and \
-                    user_has_permission(request.user, object, Permissions.Finding_Edit)
-            finding_group_id = request.data.get('finding_group', None)
-            if finding_group_id:
-                object = get_object_or_404(Finding_Group, pk=finding_group_id)
-                has_permission_result = has_permission_result and \
-                    user_has_permission(request.user, object, Permissions.Finding_Group_Edit)
-            return has_permission_result
-        else:
+        if request.method != 'POST':
             return True
+        has_permission_result = True
+        if engagement_id := request.data.get('engagement', None):
+            object = get_object_or_404(Engagement, pk=engagement_id)
+            has_permission_result = has_permission_result and \
+                    user_has_permission(request.user, object, Permissions.Engagement_Edit)
+        if finding_id := request.data.get('finding', None):
+            object = get_object_or_404(Finding, pk=finding_id)
+            has_permission_result = has_permission_result and \
+                    user_has_permission(request.user, object, Permissions.Finding_Edit)
+        if finding_group_id := request.data.get('finding_group', None):
+            object = get_object_or_404(Finding_Group, pk=finding_group_id)
+            has_permission_result = has_permission_result and \
+                    user_has_permission(request.user, object, Permissions.Finding_Group_Edit)
+        return has_permission_result
 
     def has_object_permission(self, request, view, obj):
         has_permission_result = True
-        engagement = obj.engagement
-        if engagement:
+        if engagement := obj.engagement:
             has_permission_result = has_permission_result and \
-                check_object_permission(request, engagement, Permissions.Engagement_View, Permissions.Engagement_Edit, Permissions.Engagement_Edit)
-        finding = obj.finding
-        if finding:
+                    check_object_permission(request, engagement, Permissions.Engagement_View, Permissions.Engagement_Edit, Permissions.Engagement_Edit)
+        if finding := obj.finding:
             has_permission_result = has_permission_result and \
-                check_object_permission(request, finding, Permissions.Finding_View, Permissions.Finding_Edit, Permissions.Finding_Edit)
-        finding_group = obj.finding_group
-        if finding_group:
+                    check_object_permission(request, finding, Permissions.Finding_View, Permissions.Finding_Edit, Permissions.Finding_Edit)
+        if finding_group := obj.finding_group:
             has_permission_result = has_permission_result and \
-                check_object_permission(request, finding_group, Permissions.Finding_Group_View, Permissions.Finding_Group_Edit, Permissions.Finding_Group_Edit)
+                    check_object_permission(request, finding_group, Permissions.Finding_Group_View, Permissions.Finding_Group_Edit, Permissions.Finding_Group_Edit)
         return has_permission_result
 
 
@@ -509,15 +493,15 @@ def check_auto_create_permission(user, product, product_name, engagement, engage
         if not product_type_name:
             raise serializers.ValidationError("Product '%s' doesn't exist and no product_type_name provided to create the new product in" % product_name)
 
-        if not product_type:
-            if not user_has_global_permission(user, Permissions.Product_Type_Add):
-                raise PermissionDenied("No permission to create product_type '%s'", product_type_name)
-            # new product type can be created with current user as owner, so all objects in it can be created as well
-            return True
-        else:
+        if product_type:
             if not user_has_permission(user, product_type, Permissions.Product_Type_Add_Product):
                 raise PermissionDenied("No permission to create products in product_type '%s'", product_type)
 
+        elif not user_has_global_permission(user, Permissions.Product_Type_Add):
+            raise PermissionDenied("No permission to create product_type '%s'", product_type_name)
+        else:
+            # new product type can be created with current user as owner, so all objects in it can be created as well
+            return True
         # product can be created, so objects in it can be created as well
         return True
 

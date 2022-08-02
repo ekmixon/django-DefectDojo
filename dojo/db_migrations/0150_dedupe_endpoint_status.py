@@ -11,13 +11,13 @@ class Migration(migrations.Migration):
         ('dojo', '0149_harmonize_user_format'),
     ]
 
-    def dedupe_endpoint_status(apps, schema_editor):
-        Endpoint_Status = apps.get_model('dojo', 'endpoint_status')
-        Endpoint = apps.get_model('dojo', 'endpoint')
-        Finding = apps.get_model('dojo', 'finding')
+    def dedupe_endpoint_status(self, schema_editor):
+        Endpoint_Status = self.get_model('dojo', 'endpoint_status')
+        Endpoint = self.get_model('dojo', 'endpoint')
+        Finding = self.get_model('dojo', 'finding')
 
         to_process = Endpoint_Status.objects.exclude(Q(endpoint=None) | Q(finding=None))\
-            .values('finding', 'endpoint').annotate(cnt=Count('id')).filter(cnt__gt=1)
+                .values('finding', 'endpoint').annotate(cnt=Count('id')).filter(cnt__gt=1)
         if to_process.count() == 0:
             logger.info('There is nothing to process')
         else:

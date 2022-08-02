@@ -17,8 +17,7 @@ def we_want_async(*args, func=None, **kwargs):
     from dojo.utils import get_current_user
     from dojo.models import Dojo_User
 
-    sync = kwargs.get('sync', False)
-    if sync:
+    if sync := kwargs.get('sync', False):
         logger.debug('dojo_async_task %s: running task in the foreground as sync=True has been found as kwarg', func)
         return False
 
@@ -64,12 +63,15 @@ def dojo_model_to_id(_func=None, *, parameter=0):
 
             model_or_id = get_parameter_froms_args_kwargs(args, kwargs, parameter)
 
-            if model_or_id:
-                if isinstance(model_or_id, models.Model) and we_want_async(*args, func=func, **kwargs):
-                    logger.debug('converting model_or_id to id: %s', model_or_id)
-                    id = model_or_id.id
-                    args = list(args)
-                    args[parameter] = id
+            if (
+                model_or_id
+                and isinstance(model_or_id, models.Model)
+                and we_want_async(*args, func=func, **kwargs)
+            ):
+                logger.debug('converting model_or_id to id: %s', model_or_id)
+                id = model_or_id.id
+                args = list(args)
+                args[parameter] = id
 
             return func(*args, **kwargs)
 
@@ -96,8 +98,8 @@ def dojo_model_from_id(_func=None, *, model=Finding, parameter=0):
             if not settings.CELERY_PASS_MODEL_BY_ID:
                 return func(*args, **kwargs)
 
-            logger.debug('args:' + str(args))
-            logger.debug('kwargs:' + str(kwargs))
+            logger.debug(f'args:{args}')
+            logger.debug(f'kwargs:{kwargs}')
 
             logger.debug('checking if we need to convert id to model: %s for parameter: %s', model.__name__, parameter)
 
@@ -133,7 +135,7 @@ def get_parameter_froms_args_kwargs(args, kwargs, parameter):
         # Lookup value came as a positional argument
         args = list(args)
         if parameter >= len(args):
-            raise ValueError('parameter index invalid: ' + str(parameter))
+            raise ValueError(f'parameter index invalid: {str(parameter)}')
         model_or_id = args[parameter]
     else:
         # Lookup value was passed as keyword argument
@@ -142,7 +144,7 @@ def get_parameter_froms_args_kwargs(args, kwargs, parameter):
     logger.debug('model_or_id: %s', model_or_id)
 
     if not model_or_id:
-        logger.error('unable to get parameter: ' + parameter)
+        logger.error(f'unable to get parameter: {parameter}')
 
     return model_or_id
 

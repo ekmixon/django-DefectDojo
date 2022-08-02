@@ -3,9 +3,9 @@ from django.db.models import F
 
 
 class Migration(migrations.Migration):
-    def move_to_vuln_id(apps, schema_editor):
-        finding_model = apps.get_model('dojo', 'Finding')
-        test_type_model = apps.get_model('dojo', 'Test_Type')
+    def move_to_vuln_id(self, schema_editor):
+        finding_model = self.get_model('dojo', 'Finding')
+        test_type_model = self.get_model('dojo', 'Test_Type')
         anchore_scan, _ = test_type_model.objects.get_or_create(name='Anchore Engine Scan')
         # extra protection, only migrate for the findings that have a non-null unique_id_from_tool
         findings = finding_model.objects.filter(test__test_type=anchore_scan, unique_id_from_tool__isnull=False)
@@ -16,9 +16,9 @@ class Migration(migrations.Migration):
         # reset unique_id_from_tool
         findings.update(unique_id_from_tool=None)
 
-    def reverse_move_to_vuln_id(apps, schema_editor):
-        finding_model = apps.get_model('dojo', 'Finding')
-        test_type_model = apps.get_model('dojo', 'Test_Type')
+    def reverse_move_to_vuln_id(self, schema_editor):
+        finding_model = self.get_model('dojo', 'Finding')
+        test_type_model = self.get_model('dojo', 'Test_Type')
         anchore_scan, _ = test_type_model.objects.get_or_create(name='Anchore Engine Scan')
         findings = finding_model.objects.filter(test__test_type=anchore_scan, vuln_id_from_tool__isnull=False)
 

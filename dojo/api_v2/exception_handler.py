@@ -24,27 +24,24 @@ def custom_exception_handler(exc, context):
         response.status_code = HTTP_400_BAD_REQUEST
         response.data = {}
         response.data['message'] = str(exc)
+    elif response is None:
+        # There is no standard error response, so we assume an unexpected
+        # exception. It is logged but no details are given to the user,
+        # to avoid leaking internal technical information.
+        logger.exception(exc)
+        response = Response()
+        response.status_code = HTTP_500_INTERNAL_SERVER_ERROR
+        response.data = {'message': 'Internal server error, check logs for details'}
+    elif response.status_code < 500:
+        # HTTP status codes lower than 500 are no technical errors.
+        # They need not to be logged and we provide the exception
+        # message, if it is different from the detail that is already
+        # in the response.
+        if isinstance(response.data, dict) and str(exc) != response.data.get('detail', ''):
+            response.data['message'] = str(exc)
     else:
-        if response is None:
-            # There is no standard error response, so we assume an unexpected
-            # exception. It is logged but no details are given to the user,
-            # to avoid leaking internal technical information.
-            logger.exception(exc)
-            response = Response()
-            response.status_code = HTTP_500_INTERNAL_SERVER_ERROR
-            response.data = {}
-            response.data['message'] = 'Internal server error, check logs for details'
-        else:
-            if response.status_code < 500:
-                # HTTP status codes lower than 500 are no technical errors.
-                # They need not to be logged and we provide the exception
-                # message, if it is different from the detail that is already
-                # in the response.
-                if isinstance(response.data, dict) and str(exc) != response.data.get('detail', ''):
-                    response.data['message'] = str(exc)
-            else:
-                # HTTP status code 500 or higher are technical errors.
-                # They get logged and we don't change the response.
-                logger.exception(exc)
+        # HTTP status code 500 or higher are technical errors.
+        # They get logged and we don't change the response.
+        logger.exception(exc)
 
     return response

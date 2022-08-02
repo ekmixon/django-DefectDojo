@@ -104,31 +104,23 @@ class MonthYearWidget(Widget):
         except AttributeError:
             year_val = month_val = None
             if isinstance(value, str):
-                match = RE_DATE.match(value)
-                if match:
+                if match := RE_DATE.match(value):
                     year_val,
                     month_val,
                     day_val = [int(v) for v in match.groups()]
 
-        output = []
-
-        if 'id' in self.attrs:
-            id_ = self.attrs['id']
-        else:
-            id_ = 'id_%s' % name
-
+        id_ = self.attrs['id'] if 'id' in self.attrs else f'id_{name}'
         month_choices = list(MONTHS.items())
-        if not (self.required and value):
+        if not self.required or not value:
             month_choices.append(self.none_value)
         month_choices.sort()
         local_attrs = self.build_attrs({'id': self.month_field % id_})
         s = Select(choices=month_choices)
         select_html = s.render(self.month_field % name, month_val, local_attrs)
 
-        output.append(select_html)
-
+        output = [select_html]
         year_choices = [(i, i) for i in self.years]
-        if not (self.required and value):
+        if not self.required or not value:
             year_choices.insert(0, self.none_value)
         local_attrs['id'] = self.year_field % id_
         s = Select(choices=year_choices)
@@ -138,7 +130,7 @@ class MonthYearWidget(Widget):
         return mark_safe('\n'.join(output))
 
     def id_for_label(self, id_):
-        return '%s_month' % id_
+        return f'{id_}_month'
 
     id_for_label = classmethod(id_for_label)
 
@@ -147,9 +139,7 @@ class MonthYearWidget(Widget):
         m = data.get(self.month_field % name)
         if y == m == "0":
             return None
-        if y and m:
-            return '%s-%s-%s' % (y, m, 1)
-        return data.get(name, None)
+        return f'{y}-{m}-1' if y and m else data.get(name, None)
 
 
 class Product_TypeForm(forms.ModelForm):
@@ -438,9 +428,11 @@ class ImportScanForm(forms.Form):
         scan_type = cleaned_data.get("scan_type")
         file = cleaned_data.get("file")
         if requires_file(scan_type) and not file:
-            raise forms.ValidationError('Uploading a Report File is required for {}'.format(scan_type))
-        tool_type = requires_tool_type(scan_type)
-        if tool_type:
+            raise forms.ValidationError(
+                f'Uploading a Report File is required for {scan_type}'
+            )
+
+        if tool_type := requires_tool_type(scan_type):
             api_scan_configuration = cleaned_data.get('api_scan_configuration')
             if api_scan_configuration and tool_type != api_scan_configuration.tool_configuration.tool_type.name:
                 raise forms.ValidationError(f'API scan configuration must be of tool type {tool_type}')
@@ -456,13 +448,12 @@ class ImportScanForm(forms.Form):
     # date can only be today or in the past, not the future
     def clean_scan_date(self):
         date = self.cleaned_data.get('scan_date', None)
-        if date and date.date() > datetime.today().date():
+        if date and date.date() > datetime.now().date():
             raise forms.ValidationError("The date cannot be in the future!")
         return date
 
     def get_scan_type(self):
-        TGT_scan = self.cleaned_data['scan_type']
-        return TGT_scan
+        return self.cleaned_data['scan_type']
 
 
 class ReImportScanForm(forms.Form):
@@ -514,8 +505,7 @@ class ReImportScanForm(forms.Form):
         file = cleaned_data.get("file")
         if requires_file(self.scan_type) and not file:
             raise forms.ValidationError("Uploading a report file is required for re-uploading findings.")
-        tool_type = requires_tool_type(self.scan_type)
-        if tool_type:
+        if tool_type := requires_tool_type(self.scan_type):
             api_scan_configuration = cleaned_data.get('api_scan_configuration')
             if api_scan_configuration and tool_type != api_scan_configuration.tool_configuration.tool_type.name:
                 raise forms.ValidationError(f'API scan configuration must be of tool type {tool_type}')
@@ -626,7 +616,12 @@ class EditRiskAcceptanceForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['path'].help_text = 'Existing proof uploaded: %s' % self.instance.filename() if self.instance.filename() else 'None'
+        self.fields['path'].help_text = (
+            f'Existing proof uploaded: {self.instance.filename()}'
+            if self.instance.filename()
+            else 'None'
+        )
+
         self.fields['expiration_date_warned'].disabled = True
         self.fields['expiration_date_handled'].disabled = True
 
@@ -744,14 +739,8 @@ class EngForm(forms.ModelForm):
     test_strategy = forms.URLField(required=False, label="Test Strategy URL")
 
     def __init__(self, *args, **kwargs):
-        cicd = False
-        product = None
-        if 'cicd' in kwargs:
-            cicd = kwargs.pop('cicd')
-
-        if 'product' in kwargs:
-            product = kwargs.pop('product')
-
+        cicd = kwargs.pop('cicd') if 'cicd' in kwargs else False
+        product = kwargs.pop('product') if 'product' in kwargs else None
         self.user = None
         if 'user' in kwargs:
             self.user = kwargs.pop('user')
@@ -889,10 +878,7 @@ class AddFindingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         req_resp = kwargs.pop('req_resp')
 
-        product = None
-        if 'product' in kwargs:
-            product = kwargs.pop('product')
-
+        product = kwargs.pop('product') if 'product' in kwargs else None
         super(AddFindingForm, self).__init__(*args, **kwargs)
 
         if product:
@@ -963,10 +949,7 @@ class AdHocFindingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         req_resp = kwargs.pop('req_resp')
 
-        product = None
-        if 'product' in kwargs:
-            product = kwargs.pop('product')
-
+        product = kwargs.pop('product') if 'product' in kwargs else None
         super(AdHocFindingForm, self).__init__(*args, **kwargs)
 
         if product:
@@ -1030,10 +1013,7 @@ class PromoteFindingForm(forms.ModelForm):
                    'out_of_scope', 'risk_accept', 'under_defect_review')
 
     def __init__(self, *args, **kwargs):
-        product = None
-        if 'product' in kwargs:
-            product = kwargs.pop('product')
-
+        product = kwargs.pop('product') if 'product' in kwargs else None
         super(PromoteFindingForm, self).__init__(*args, **kwargs)
 
         if product:
@@ -1140,12 +1120,9 @@ class FindingForm(forms.ModelForm):
                    'out_of_scope', 'risk_accept', 'under_defect_review')
 
     def __init__(self, *args, **kwargs):
-        req_resp = None
-        if 'req_resp' in kwargs:
-            req_resp = kwargs.pop('req_resp')
-
+        req_resp = kwargs.pop('req_resp') if 'req_resp' in kwargs else None
         self.can_edit_mitigated_data = kwargs.pop('can_edit_mitigated_data') if 'can_edit_mitigated_data' in kwargs \
-            else False
+                else False
 
         super(FindingForm, self).__init__(*args, **kwargs)
 
@@ -1156,11 +1133,10 @@ class FindingForm(forms.ModelForm):
         # when adding from template, we don't have access to the test. quickfix for now to just hide simple risk acceptance
         if not hasattr(self.instance, 'test') or (not self.instance.risk_accepted and not self.instance.test.engagement.product.enable_simple_risk_acceptance):
             del self.fields['risk_accepted']
+        elif self.instance.risk_accepted:
+            self.fields['risk_accepted'].help_text = "Uncheck to unaccept the risk. Use full risk acceptance from the dropdown menu if you need advanced settings such as an expiry date."
         else:
-            if self.instance.risk_accepted:
-                self.fields['risk_accepted'].help_text = "Uncheck to unaccept the risk. Use full risk acceptance from the dropdown menu if you need advanced settings such as an expiry date."
-            elif self.instance.test.engagement.product.enable_simple_risk_acceptance:
-                self.fields['risk_accepted'].help_text = "Check to accept the risk. Use full risk acceptance from the dropdown menu if you need advanced settings such as an expiry date."
+            self.fields['risk_accepted'].help_text = "Check to accept the risk. Use full risk acceptance from the dropdown menu if you need advanced settings such as an expiry date."
 
         # self.fields['tags'].widget.choices = t
         if req_resp:
@@ -1239,12 +1215,12 @@ class StubFindingForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super(StubFindingForm, self).clean()
-        if 'title' in cleaned_data:
-            if len(cleaned_data['title']) <= 0:
-                raise forms.ValidationError("The title is required.")
-        else:
+        if (
+            'title' in cleaned_data
+            and len(cleaned_data['title']) <= 0
+            or 'title' not in cleaned_data
+        ):
             raise forms.ValidationError("The title is required.")
-
         return cleaned_data
 
 
@@ -1275,12 +1251,12 @@ class ApplyFindingTemplateForm(forms.Form):
     def clean(self):
         cleaned_data = super(ApplyFindingTemplateForm, self).clean()
 
-        if 'title' in cleaned_data:
-            if len(cleaned_data['title']) <= 0:
-                raise forms.ValidationError("The title is required.")
-        else:
+        if (
+            'title' in cleaned_data
+            and len(cleaned_data['title']) <= 0
+            or 'title' not in cleaned_data
+        ):
             raise forms.ValidationError("The title is required.")
-
         return cleaned_data
 
     class Meta:
@@ -1422,9 +1398,7 @@ class AddEndpointForm(forms.Form):
                               "Choose from the list or add new tags. Press Enter key to add.")
 
     def __init__(self, *args, **kwargs):
-        product = None
-        if 'product' in kwargs:
-            product = kwargs.pop('product')
+        product = kwargs.pop('product') if 'product' in kwargs else None
         super(AddEndpointForm, self).__init__(*args, **kwargs)
         self.fields['product'] = forms.ModelChoiceField(queryset=get_authorized_products(Permissions.Endpoint_Add))
         if product is not None:
@@ -1453,16 +1427,17 @@ class AddEndpointForm(forms.Form):
 
         cleaned_data = super(AddEndpointForm, self).clean()
 
-        if 'endpoint' in cleaned_data and 'product' in cleaned_data:
-            endpoint = cleaned_data['endpoint']
-            product = cleaned_data['product']
-            if isinstance(product, Product):
-                self.product = product
-            else:
-                self.product = Product.objects.get(id=int(product))
-        else:
+        if 'endpoint' not in cleaned_data or 'product' not in cleaned_data:
             raise forms.ValidationError('Please enter a valid URL or IP address.',
                                         code='invalid')
+
+        endpoint = cleaned_data['endpoint']
+        product = cleaned_data['product']
+        self.product = (
+            product
+            if isinstance(product, Product)
+            else Product.objects.get(id=int(product))
+        )
 
         endpoints_to_add_list, errors = validate_endpoints_to_add(endpoint)
         if errors:
@@ -1575,10 +1550,7 @@ class ReviewFindingForm(forms.Form):
                                      'below to provide documentation.')})
 
     def __init__(self, *args, **kwargs):
-        finding = None
-        if 'finding' in kwargs:
-            finding = kwargs.pop('finding')
-
+        finding = kwargs.pop('finding') if 'finding' in kwargs else None
         super(ReviewFindingForm, self).__init__(*args, **kwargs)
         self.fields['reviewers'].choices = self._get_choices(get_authorized_users(Permissions.Finding_View).filter(is_active=True))
 
@@ -1588,10 +1560,7 @@ class ReviewFindingForm(forms.Form):
 
     @staticmethod
     def _get_choices(queryset):
-        l_choices = []
-        for item in queryset:
-            l_choices.append((item.pk, item.get_full_name()))
-        return l_choices
+        return [(item.pk, item.get_full_name()) for item in queryset]
 
     class Meta:
         fields = ['reviewers', 'entry']
@@ -2129,7 +2098,8 @@ class JIRAForm(forms.ModelForm):
             logger.debug('valid JIRA config!')
         except Exception as e:
             # form only used by admins, so we can show full error message using str(e) which can help debug any problems
-            message = 'Unable to authenticate to JIRA. Please check the URL, username, password, captcha challenge, Network connection. Details in alert on top right. ' + str(e)
+            message = f'Unable to authenticate to JIRA. Please check the URL, username, password, captcha challenge, Network connection. Details in alert on top right. {str(e)}'
+
             self.add_error('username', message)
             self.add_error('password', message)
 
@@ -2156,7 +2126,8 @@ class ExpressJIRAForm(forms.ModelForm):
             logger.debug('valid JIRA config!')
         except Exception as e:
             # form only used by admins, so we can show full error message using str(e) which can help debug any problems
-            message = 'Unable to authenticate to JIRA. Please check the URL, username, password, captcha challenge, Network connection. Details in alert on top right. ' + str(e)
+            message = f'Unable to authenticate to JIRA. Please check the URL, username, password, captcha challenge, Network connection. Details in alert on top right. {str(e)}'
+
             self.add_error('username', message)
             self.add_error('password', message)
 
@@ -2338,9 +2309,7 @@ class ObjectSettingsForm(forms.ModelForm):
         super(ObjectSettingsForm, self).__init__(*args, **kwargs)
 
     def clean(self):
-        form_data = self.cleaned_data
-
-        return form_data
+        return self.cleaned_data
 
 
 class CredMappingForm(forms.ModelForm):
@@ -2510,9 +2479,20 @@ class JIRAProjectForm(forms.ModelForm):
         if self.target == 'engagement':
             product_name = self.product.name if self.product else self.engagement.product.name if self.engagement.product else ''
 
-            self.fields['project_key'].widget = forms.TextInput(attrs={'placeholder': 'JIRA settings inherited from product ''%s''' % product_name})
-            self.fields['project_key'].help_text = 'JIRA settings are inherited from product ''%s'', unless configured differently here.' % product_name
-            self.fields['jira_instance'].help_text = 'JIRA settings are inherited from product ''%s'' , unless configured differently here.' % product_name
+            self.fields['project_key'].widget = forms.TextInput(
+                attrs={
+                    'placeholder': f'JIRA settings inherited from product {product_name}'
+                }
+            )
+
+            self.fields[
+                'project_key'
+            ].help_text = f'JIRA settings are inherited from product {product_name}, unless configured differently here.'
+
+            self.fields[
+                'jira_instance'
+            ].help_text = f'JIRA settings are inherited from product {product_name} , unless configured differently here.'
+
 
             # if we don't have an instance, django will insert a blank empty one :-(
             # so we have to check for id to make sure we only trigger this when there is a real instance from db
@@ -2542,7 +2522,10 @@ class JIRAProjectForm(forms.ModelForm):
                 # we have to check that we are not in a POST request where jira project config data is posted
                 # this is because initial values will overwrite the actual values entered by the user
                 # makes no sense, but seems to be accepted behaviour: https://code.djangoproject.com/ticket/30407
-                if jira_project_product and not (self.prefix + '-jira_instance') in self.data:
+                if (
+                    jira_project_product
+                    and f'{self.prefix}-jira_instance' not in self.data
+                ):
                     logger.debug('setting jira project fields from product2')
                     self.initial['jira_instance'] = jira_project_product.jira_instance.id if jira_project_product.jira_instance else None
                     self.initial['project_key'] = jira_project_product.project_key
@@ -2630,15 +2613,18 @@ class JIRAFindingForm(forms.Form):
             # This will show the checkbox as checked and greyed out, this way the user is aware
             # that issues will be pushed to JIRA, given their product-level settings.
             self.fields['push_to_jira'].help_text = \
-                "Push all issues is enabled on this product. If you do not wish to push all issues" \
-                " to JIRA, please disable Push all issues on this product."
+                    "Push all issues is enabled on this product. If you do not wish to push all issues" \
+                    " to JIRA, please disable Push all issues on this product."
             self.fields['push_to_jira'].widget.attrs['checked'] = 'checked'
             self.fields['push_to_jira'].disabled = True
 
-        if self.instance:
-            if hasattr(self.instance, 'has_jira_issue') and self.instance.has_jira_issue:
-                self.initial['jira_issue'] = self.instance.jira_issue.jira_key
-                self.fields['push_to_jira'].widget.attrs['checked'] = 'checked'
+        if (
+            self.instance
+            and hasattr(self.instance, 'has_jira_issue')
+            and self.instance.has_jira_issue
+        ):
+            self.initial['jira_issue'] = self.instance.jira_issue.jira_key
+            self.fields['push_to_jira'].widget.attrs['checked'] = 'checked'
         if is_finding_groups_enabled():
             self.fields['jira_issue'].widget = forms.TextInput(attrs={'placeholder': 'Leave empty and check push to jira to create a new JIRA issue for this finding, or the group this finding is in.'})
         else:
@@ -2660,15 +2646,11 @@ class JIRAFindingForm(forms.Form):
 
         logger.debug('self.cleaned_data.push_to_jira: %s', self.cleaned_data.get('push_to_jira', None))
 
-        if self.cleaned_data.get('push_to_jira', None) and finding.has_jira_group_issue:
-            can_be_pushed_to_jira, error_message, error_code = jira_helper.can_be_pushed_to_jira(self.instance.finding_group, self.finding_form)
-            if not can_be_pushed_to_jira:
-                self.add_error('push_to_jira', ValidationError(error_message, code=error_code))
-                # for field in error_fields:
-                #     self.finding_form.add_error(field, error)
-
-        elif self.cleaned_data.get('push_to_jira', None):
-            can_be_pushed_to_jira, error_message, error_code = jira_helper.can_be_pushed_to_jira(self.instance, self.finding_form)
+        if self.cleaned_data.get('push_to_jira', None):
+            if finding.has_jira_group_issue:
+                can_be_pushed_to_jira, error_message, error_code = jira_helper.can_be_pushed_to_jira(self.instance.finding_group, self.finding_form)
+            else:
+                can_be_pushed_to_jira, error_message, error_code = jira_helper.can_be_pushed_to_jira(self.instance, self.finding_form)
             if not can_be_pushed_to_jira:
                 self.add_error('push_to_jira', ValidationError(error_message, code=error_code))
                 # for field in error_fields:
@@ -2699,7 +2681,10 @@ class JIRAFindingForm(forms.Form):
             if jira_issue_need_to_exist:
                 jira_issue_new = jira_helper.jira_get_issue(jira_project, jira_issue_key_new)
                 if not jira_issue_new:
-                    raise ValidationError('JIRA issue ' + jira_issue_key_new + ' does not exist or cannot be retrieved')
+                    raise ValidationError(
+                        f'JIRA issue {jira_issue_key_new} does not exist or cannot be retrieved'
+                    )
+
 
                 logger.debug('checking if provided jira issue id already is linked to another finding')
                 jira_issues = JIRA_Issue.objects.filter(jira_id=jira_issue_new.id, jira_key=jira_issue_key_new).exclude(engagement__isnull=False)
@@ -2709,7 +2694,12 @@ class JIRAFindingForm(forms.Form):
                     jira_issues = jira_issues.exclude(finding=finding)
 
                 if len(jira_issues) > 0:
-                    raise ValidationError('JIRA issue ' + jira_issue_key_new + ' already linked to ' + reverse('view_finding', args=(jira_issues[0].finding_id,)))
+                    raise ValidationError(
+                        f'JIRA issue {jira_issue_key_new} already linked to '
+                        + reverse(
+                            'view_finding', args=(jira_issues[0].finding_id,)
+                        )
+                    )
 
     jira_issue = forms.CharField(required=False, label="Linked JIRA Issue",
                 validators=[validators.RegexValidator(
@@ -2743,11 +2733,10 @@ class JIRAEngagementForm(forms.Form):
 
         super(JIRAEngagementForm, self).__init__(*args, **kwargs)
 
-        if self.instance:
-            if self.instance.has_jira_issue:
-                self.fields['push_to_jira'].widget.attrs['checked'] = 'checked'
-                self.fields['push_to_jira'].label = 'Update JIRA Epic'
-                self.fields['push_to_jira'].help_text = 'Checking this will update the existing EPIC in JIRA.'
+        if self.instance and self.instance.has_jira_issue:
+            self.fields['push_to_jira'].widget.attrs['checked'] = 'checked'
+            self.fields['push_to_jira'].label = 'Update JIRA Epic'
+            self.fields['push_to_jira'].help_text = 'Checking this will update the existing EPIC in JIRA.'
 
     push_to_jira = forms.BooleanField(required=False, label="Create EPIC", help_text="Checking this will create an EPIC in JIRA for this engagement.")
 
@@ -2784,9 +2773,14 @@ class GoogleSheetFieldsForm(forms.Form):
         for i in self.all_fields:
             self.fields[i.name] = forms.ChoiceField(choices=options)
             if i.name == 'id' or i.editable is False or i.many_to_one or i.name in protect:
-                self.fields['Protect ' + i.name] = forms.BooleanField(initial=True, required=True, disabled=True)
+                self.fields[f'Protect {i.name}'] = forms.BooleanField(
+                    initial=True, required=True, disabled=True
+                )
+
             else:
-                self.fields['Protect ' + i.name] = forms.BooleanField(initial=False, required=False)
+                self.fields[f'Protect {i.name}'] = forms.BooleanField(
+                    initial=False, required=False
+                )
 
 
 class LoginBanner(forms.Form):
@@ -2803,8 +2797,7 @@ class LoginBanner(forms.Form):
     )
 
     def clean(self):
-        cleaned_data = super().clean()
-        return cleaned_data
+        return super().clean()
 
 
 # ==============================
@@ -2858,11 +2851,7 @@ class TextQuestionForm(QuestionForm):
             question=self.question
         )
 
-        if initial_answer.exists():
-            initial_answer = initial_answer[0].answer
-        else:
-            initial_answer = ''
-
+        initial_answer = initial_answer[0].answer if initial_answer.exists() else ''
         self.fields['answer'] = forms.CharField(
             label=self.question.text,
             widget=forms.Textarea(attrs={"rows": 3, "cols": 10}),
@@ -2903,13 +2892,14 @@ class ChoiceQuestionForm(QuestionForm):
         # initial values
 
         initial_choices = []
-        choice_answer = ChoiceAnswer.objects.filter(
-            answered_survey=self.answered_survey,
-            question=self.question,
-        ).annotate(a=Count('answer')).filter(a__gt=0)
-
-        # we have ChoiceAnswer instance
-        if choice_answer:
+        if (
+            choice_answer := ChoiceAnswer.objects.filter(
+                answered_survey=self.answered_survey,
+                question=self.question,
+            )
+            .annotate(a=Count('answer'))
+            .filter(a__gt=0)
+        ):
             choice_answer = choice_answer[0]
             initial_choices = choice_answer.answer.all().values_list('id',
                                                                      flat=True)
@@ -3089,10 +3079,7 @@ class MultiWidgetBasic(forms.widgets.MultiWidget):
         super(MultiWidgetBasic, self).__init__(widgets, attrs)
 
     def decompress(self, value):
-        if value:
-            return pickle.loads(value)
-        else:
-            return [None, None, None, None, None, None]
+        return pickle.loads(value) if value else [None, None, None, None, None, None]
 
     def format_output(self, rendered_widgets):
         return '<br/>'.join(rendered_widgets)
@@ -3162,9 +3149,7 @@ class AssignUserForm(forms.ModelForm):
                                 widget=forms.widgets.HiddenInput())
 
     def __init__(self, *args, **kwargs):
-        assignee = None
-        if 'assignee' in kwargs:
-            assignee = kwargs.pop('asignees')
+        assignee = kwargs.pop('asignees') if 'assignee' in kwargs else None
         super(AssignUserForm, self).__init__(*args, **kwargs)
         if assignee is None:
             self.fields['assignee'] = forms.ModelChoiceField(queryset=get_authorized_users(Permissions.Engagement_View), empty_label='Not Assigned', required=False)
@@ -3204,9 +3189,9 @@ class ConfigurationPermissionsForm(forms.Form):
                     self.fields[codename].disabled = True
 
         permissions_list = Permission.objects.all()
-        self.permissions = {}
-        for permission in permissions_list:
-            self.permissions[permission.codename] = permission
+        self.permissions = {
+            permission.codename: permission for permission in permissions_list
+        }
 
     def save(self):
         if get_current_user().is_superuser:
@@ -3223,11 +3208,9 @@ class ConfigurationPermissionsForm(forms.Form):
                 self.group.auth_group.permissions.add(self.permissions[codename])
             else:
                 raise Exception('Neither user or group are set')
+        elif self.user:
+            self.user.user_permissions.remove(self.permissions[codename])
+        elif self.group:
+            self.group.auth_group.permissions.remove(self.permissions[codename])
         else:
-            # Checkbox is unset
-            if self.user:
-                self.user.user_permissions.remove(self.permissions[codename])
-            elif self.group:
-                self.group.auth_group.permissions.remove(self.permissions[codename])
-            else:
-                raise Exception('Neither user or group are set')
+            raise Exception('Neither user or group are set')

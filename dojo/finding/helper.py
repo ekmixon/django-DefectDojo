@@ -94,29 +94,24 @@ def update_finding_status(new_state_finding, user, changed_fields=None):
         new_state_finding.mitigated = new_state_finding.mitigated or now
         new_state_finding.mitigated_by = new_state_finding.mitigated_by or user
 
-    if is_new_finding or 'active' in changed_fields:
-        # finding is being (re)activated
-        if new_state_finding.active:
-            new_state_finding.false_p = False
-            new_state_finding.out_of_scope = False
-            new_state_finding.is_mitigated = False
-            new_state_finding.mitigated = None
-            new_state_finding.mitigated_by = None
-        else:
-            # finding is being deactivated
-            pass
-
-    if is_new_finding or 'verified' in changed_fields:
-        pass
-
-    if is_new_finding or 'false_p' in changed_fields or 'out_of_scope' in changed_fields:
-        # existing behaviour is that false_p or out_of_scope implies mitigated
-        if new_state_finding.false_p or new_state_finding.out_of_scope:
-            new_state_finding.mitigated = new_state_finding.mitigated or now
-            new_state_finding.mitigated_by = new_state_finding.mitigated_by or user
-            new_state_finding.is_mitigated = True
-            new_state_finding.active = False
-            new_state_finding.verified = False
+    if (
+        is_new_finding or 'active' in changed_fields
+    ) and new_state_finding.active:
+        new_state_finding.false_p = False
+        new_state_finding.out_of_scope = False
+        new_state_finding.is_mitigated = False
+        new_state_finding.mitigated = None
+        new_state_finding.mitigated_by = None
+    if (
+        is_new_finding
+        or 'false_p' in changed_fields
+        or 'out_of_scope' in changed_fields
+    ) and (new_state_finding.false_p or new_state_finding.out_of_scope):
+        new_state_finding.mitigated = new_state_finding.mitigated or now
+        new_state_finding.mitigated_by = new_state_finding.mitigated_by or user
+        new_state_finding.is_mitigated = True
+        new_state_finding.active = False
+        new_state_finding.verified = False
 
     # always reset some fields if the finding is not a duplicate
     if not new_state_finding.duplicate:
@@ -192,31 +187,31 @@ def remove_from_finding_group(finds):
 
 def update_finding_group(finding, finding_group):
     # finding_group = Finding_Group.objects.get(id=group)
-    if finding_group is not None:
-        if finding_group != finding.finding_group:
-            if finding.finding_group:
-                logger.debug('removing finding %d from finding_group %s', finding.id, finding.finding_group)
-                finding.finding_group.findings.remove(finding)
-            logger.debug('adding finding %d to finding_group %s', finding.id, finding_group)
-            finding_group.findings.add(finding)
-    else:
+    if finding_group is None:
         if finding.finding_group:
             logger.debug('removing finding %d from finding_group %s', finding.id, finding.finding_group)
             finding.finding_group.findings.remove(finding)
 
+    elif finding_group != finding.finding_group:
+        if finding.finding_group:
+            logger.debug('removing finding %d from finding_group %s', finding.id, finding.finding_group)
+            finding.finding_group.findings.remove(finding)
+        logger.debug('adding finding %d to finding_group %s', finding.id, finding_group)
+        finding_group.findings.add(finding)
+
 
 def get_group_by_group_name(finding, finding_group_by_option):
     if finding_group_by_option == 'component_name':
-        group_name = finding.component_name if finding.component_name else 'None'
+        group_name = finding.component_name or 'None'
     elif finding_group_by_option == 'component_name+component_version':
-        group_name = '%s:%s' % ((finding.component_name if finding.component_name else 'None'),
-        (finding.component_version if finding.component_version else 'None'))
-    elif finding_group_by_option == 'file_path':
-        group_name = 'Filepath %s' % (finding.file_path if finding.file_path else 'None')
-    else:
-        raise ValueError("Invalid group_by option %s" % finding_group_by_option)
+        group_name = f"{finding.component_name or 'None'}:{finding.component_version or 'None'}"
 
-    return 'Findings in: %s' % group_name
+    elif finding_group_by_option == 'file_path':
+        group_name = f"Filepath {finding.file_path or 'None'}"
+    else:
+        raise ValueError(f"Invalid group_by option {finding_group_by_option}")
+
+    return f'Findings in: {group_name}'
 
 
 def group_findings_by(finds, finding_group_by_option):
@@ -252,7 +247,7 @@ def add_finding_to_auto_group(finding, group_by, **kwargs):
     name = get_group_by_group_name(finding, group_by)
     creator = get_current_user()
     if not creator:
-        creator = kwargs.get('async_user', None)
+        creator = kwargs.get('async_user')
     finding_group, created = Finding_Group.objects.get_or_create(test=test, creator=creator, name=name)
     if created:
         logger.debug('Created Finding Group %d:%s for test %d:%s', finding_group.id, finding_group, test.id, test)
@@ -270,15 +265,14 @@ def post_process_finding_save(finding, dedupe_option=True, false_history=False, 
 
     # STEP 1 run all status changing tasks sequentially to avoid race conditions
     if dedupe_option:
-        if finding.hash_code is not None:
-            if system_settings.enable_deduplication:
-                from dojo.utils import do_dedupe_finding
-                do_dedupe_finding(finding, *args, **kwargs)
-            else:
-                deduplicationLogger.debug("skipping dedupe because it's disabled in system settings")
-        else:
+        if finding.hash_code is None:
             deduplicationLogger.warning("skipping dedupe because hash_code is None")
 
+        elif system_settings.enable_deduplication:
+            from dojo.utils import do_dedupe_finding
+            do_dedupe_finding(finding, *args, **kwargs)
+        else:
+            deduplicationLogger.debug("skipping dedupe because it's disabled in system settings")
     if false_history:
         if system_settings.false_positive_history:
             from dojo.utils import do_false_positive_history
@@ -308,7 +302,7 @@ def post_process_finding_save(finding, dedupe_option=True, false_history=False, 
         # but what about the push_all boolean? Let's see how this works for now and get some feedback.
         if finding.has_jira_issue or not finding.finding_group:
             jira_helper.push_to_jira(finding)
-        elif finding.finding_group:
+        else:
             jira_helper.push_to_jira(finding.finding_group)
 
 
@@ -339,8 +333,7 @@ def finding_delete(instance, **kwargs):
         # but django still calls delete() in this case
         return
 
-    duplicate_cluster = instance.original_finding.all()
-    if duplicate_cluster:
+    if duplicate_cluster := instance.original_finding.all():
         reconfigure_duplicate_cluster(instance, duplicate_cluster)
     else:
         logger.debug('no duplicate cluster found for finding: %d, so no need to reconfigure', instance.id)
@@ -428,10 +421,8 @@ def prepare_duplicates_for_delete(test=None, engagement=None):
 
     # remove the link to the original from the duplicates inside the cluster so they can be safely deleted by the django framework
     total = len(originals)
-    i = 0
     # logger.debug('originals: %s', [original.id for original in originals])
-    for original in originals:
-        i += 1
+    for i, original in enumerate(originals, start=1):
         logger.debug('%d/%d: preparing duplicate cluster for deletion of original: %d', i, total, original.id)
         cluster_inside = original.original_finding.all()
         if engagement:
@@ -544,10 +535,7 @@ def removeLoop(finding_id, counter):
 
 def add_endpoints(new_finding, form):
     added_endpoints = save_endpoints_to_add(form.endpoints_to_add_list, new_finding.test.engagement.product)
-    endpoint_ids = []
-    for endpoint in added_endpoints:
-        endpoint_ids.append(endpoint.id)
-
+    endpoint_ids = [endpoint.id for endpoint in added_endpoints]
     new_finding.endpoints.set(form.cleaned_data['endpoints'] | Endpoint.objects.filter(id__in=endpoint_ids))
 
     for endpoint in new_finding.endpoints.all():
@@ -571,10 +559,7 @@ def save_vulnerability_ids(finding, vulnerability_ids):
     for vulnerability_id in previous_vulnerability_ids:
         vulnerability_id.delete()
 
-    if vulnerability_ids:
-        finding.cve = vulnerability_ids[0]
-    else:
-        finding.cve = None
+    finding.cve = vulnerability_ids[0] if vulnerability_ids else None
 
 
 def save_vulnerability_ids_template(finding_template, vulnerability_ids):
@@ -590,7 +575,4 @@ def save_vulnerability_ids_template(finding_template, vulnerability_ids):
     for vulnerability_id in previous_vulnerability_ids:
         vulnerability_id.delete()
 
-    if vulnerability_ids:
-        finding_template.cve = vulnerability_ids[0]
-    else:
-        finding_template.cve = None
+    finding_template.cve = vulnerability_ids[0] if vulnerability_ids else None

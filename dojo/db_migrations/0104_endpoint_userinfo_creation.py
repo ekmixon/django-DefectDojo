@@ -8,8 +8,10 @@ logger = logging.getLogger(__name__)
 def move_fqdn_to_host(apps, schema_editor):
     Endpoint_model = apps.get_model('dojo', 'Endpoint')
     for endpoint in Endpoint_model.objects.filter(fqdn__isnull=False):
-        logger.info('In Endpoint {} (id={}), host "{}" will be replaced by fqdn "{}" because fqdn field will be'
-            ' removed.'.format(str(endpoint), endpoint.pk, endpoint.host, endpoint.fqdn))
+        logger.info(
+            f'In Endpoint {str(endpoint)} (id={endpoint.pk}), host "{endpoint.host}" will be replaced by fqdn "{endpoint.fqdn}" because fqdn field will be removed.'
+        )
+
         endpoint.host = endpoint.fqdn
         endpoint.save()
 

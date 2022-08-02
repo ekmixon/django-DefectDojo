@@ -83,10 +83,13 @@ def edit_dev_env(request, deid):
                     'Environment deleted successfully.',
                     extra_tags='alert-success')
             except RestrictedError as err:
-                messages.add_message(request,
-                                        messages.WARNING,
-                                        'Environment cannot be deleted: {}'.format(err),
-                                        extra_tags='alert-warning')
+                messages.add_message(
+                    request,
+                    messages.WARNING,
+                    f'Environment cannot be deleted: {err}',
+                    extra_tags='alert-warning',
+                )
+
             return HttpResponseRedirect(reverse('dev_env'))
 
     add_breadcrumb(title="Edit Environment", top_level=False, request=request)

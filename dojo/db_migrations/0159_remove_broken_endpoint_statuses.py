@@ -8,8 +8,8 @@ class Migration(migrations.Migration):
         ('dojo', '0158_vulnerability_id'),
     ]
 
-    def remove_broken_endpoint_statuses_local(apps, schema_editor):
-        remove_broken_endpoint_statuses(apps=apps)
+    def remove_broken_endpoint_statuses_local(self, schema_editor):
+        remove_broken_endpoint_statuses(self=self)
 
     operations = [
         migrations.RunPython(remove_broken_endpoint_statuses_local)

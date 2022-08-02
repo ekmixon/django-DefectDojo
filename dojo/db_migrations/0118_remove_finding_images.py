@@ -27,13 +27,12 @@ def move_images_to_files(apps, schema_editor):
                 try:
                     with transaction.atomic():
                         file = FileUpload_model.objects.create(
-                            title=image.caption[:50] + '-' + caption_uuid,
-                            file=image.image
+                            title=f'{image.caption[:50]}-{caption_uuid}',
+                            file=image.image,
                         )
+
                 except IntegrityError:
                     passed = True
-                    pass
-
             if not passed:
                 finding.files.add(file)
             else:

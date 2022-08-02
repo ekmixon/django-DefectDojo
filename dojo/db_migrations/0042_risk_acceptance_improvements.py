@@ -6,12 +6,13 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
 
-    def set_name_from_created_date(apps, schema_editor):
+    def set_name_from_created_date(self, schema_editor):
         # We can't import the Risk_Acceptance model directly as it may be a newer
         # version than this migration expects. We use the historical version.
-        Risk_Acceptance = apps.get_model('dojo', 'Risk_Acceptance')
+        Risk_Acceptance = self.get_model('dojo', 'Risk_Acceptance')
         for ra in Risk_Acceptance.objects.all():
-            ra.name = 'Legacy acceptance created on %s' % ra.created.strftime('%b %d, %Y, %H:%M:%S')
+            ra.name = f"Legacy acceptance created on {ra.created.strftime('%b %d, %Y, %H:%M:%S')}"
+
             ra.save()
 
     dependencies = [

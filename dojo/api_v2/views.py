@@ -198,17 +198,26 @@ class EndPointViewSet(mixins.ListModelMixin,
     def generate_report(self, request, pk=None):
         endpoint = self.get_object()
 
-        options = {}
         # prepare post data
         report_options = serializers.ReportGenerateOptionSerializer(data=request.data)
-        if report_options.is_valid():
-            options['include_finding_notes'] = report_options.validated_data['include_finding_notes']
-            options['include_finding_images'] = report_options.validated_data['include_finding_images']
-            options['include_executive_summary'] = report_options.validated_data['include_executive_summary']
-            options['include_table_of_contents'] = report_options.validated_data['include_table_of_contents']
-        else:
+        if not report_options.is_valid():
             return Response(report_options.errors,
                 status=status.HTTP_400_BAD_REQUEST)
+
+        options = {
+            'include_finding_notes': report_options.validated_data[
+                'include_finding_notes'
+            ],
+            'include_finding_images': report_options.validated_data[
+                'include_finding_images'
+            ],
+            'include_executive_summary': report_options.validated_data[
+                'include_executive_summary'
+            ],
+            'include_table_of_contents': report_options.validated_data[
+                'include_table_of_contents'
+            ],
+        }
 
         data = report_generate(request, endpoint, options)
         report = serializers.ReportGenerateSerializer(data)
@@ -306,17 +315,26 @@ class EngagementViewSet(mixins.ListModelMixin,
     def generate_report(self, request, pk=None):
         engagement = self.get_object()
 
-        options = {}
         # prepare post data
         report_options = serializers.ReportGenerateOptionSerializer(data=request.data)
-        if report_options.is_valid():
-            options['include_finding_notes'] = report_options.validated_data['include_finding_notes']
-            options['include_finding_images'] = report_options.validated_data['include_finding_images']
-            options['include_executive_summary'] = report_options.validated_data['include_executive_summary']
-            options['include_table_of_contents'] = report_options.validated_data['include_table_of_contents']
-        else:
+        if not report_options.is_valid():
             return Response(report_options.errors,
                 status=status.HTTP_400_BAD_REQUEST)
+
+        options = {
+            'include_finding_notes': report_options.validated_data[
+                'include_finding_notes'
+            ],
+            'include_finding_images': report_options.validated_data[
+                'include_finding_images'
+            ],
+            'include_executive_summary': report_options.validated_data[
+                'include_executive_summary'
+            ],
+            'include_table_of_contents': report_options.validated_data[
+                'include_table_of_contents'
+            ],
+        }
 
         data = report_generate(request, engagement, options)
         report = serializers.ReportGenerateSerializer(data)
@@ -345,14 +363,13 @@ class EngagementViewSet(mixins.ListModelMixin,
         engagement = self.get_object()
         if request.method == 'POST':
             new_note = serializers.AddNewNoteOptionSerializer(data=request.data)
-            if new_note.is_valid():
-                entry = new_note.validated_data['entry']
-                private = new_note.validated_data.get('private', False)
-                note_type = new_note.validated_data.get('note_type', None)
-            else:
+            if not new_note.is_valid():
                 return Response(new_note.errors,
                     status=status.HTTP_400_BAD_REQUEST)
 
+            entry = new_note.validated_data['entry']
+            private = new_note.validated_data.get('private', False)
+            note_type = new_note.validated_data.get('note_type', None)
             author = request.user
             note = Notes(entry=entry, author=author, private=private, note_type=note_type)
             note.save()
@@ -398,12 +415,11 @@ class EngagementViewSet(mixins.ListModelMixin,
         engagement = self.get_object()
         if request.method == 'POST':
             new_file = serializers.FileSerializer(data=request.data)
-            if new_file.is_valid():
-                title = new_file.validated_data['title']
-                file = new_file.validated_data['file']
-            else:
+            if not new_file.is_valid():
                 return Response(new_file.errors, status=status.HTTP_400_BAD_REQUEST)
 
+            title = new_file.validated_data['title']
+            file = new_file.validated_data['file']
             file = FileUpload(title=title, file=file)
             file.save()
             engagement.files.add(file)
@@ -558,19 +574,18 @@ class FindingViewSet(prefetch.PrefetchListMixin,
 
         if request.method == 'POST':
             new_tags = serializers.TagSerializer(data=request.data)
-            if new_tags.is_valid():
-                all_tags = finding.tags
-                all_tags = serializers.TagSerializer({"tags": all_tags}).data['tags']
-
-                for tag in tagulous.utils.parse_tags(new_tags.validated_data['tags']):
-                    if tag not in all_tags:
-                        all_tags.append(tag)
-                new_tags = tagulous.utils.render_tags(all_tags)
-                finding.tags = new_tags
-                finding.save()
-            else:
+            if not new_tags.is_valid():
                 return Response(new_tags.errors,
                     status=status.HTTP_400_BAD_REQUEST)
+            all_tags = finding.tags
+            all_tags = serializers.TagSerializer({"tags": all_tags}).data['tags']
+
+            for tag in tagulous.utils.parse_tags(new_tags.validated_data['tags']):
+                if tag not in all_tags:
+                    all_tags.append(tag)
+            new_tags = tagulous.utils.render_tags(all_tags)
+            finding.tags = new_tags
+            finding.save()
         tags = finding.tags
         serialized_tags = serializers.TagSerializer({"tags": tags})
         return Response(serialized_tags.data)
@@ -599,19 +614,18 @@ class FindingViewSet(prefetch.PrefetchListMixin,
 
         if request.method == 'POST':
             burps = serializers.BurpRawRequestResponseSerializer(data=request.data, many=isinstance(request.data, list))
-            if burps.is_valid():
-                for pair in burps.validated_data['req_resp']:
-                    burp_rr = BurpRawRequestResponse(
-                                    finding=finding,
-                                    burpRequestBase64=base64.b64encode(pair["request"].encode("utf-8")),
-                                    burpResponseBase64=base64.b64encode(pair["response"].encode("utf-8")),
-                                )
-                    burp_rr.clean()
-                    burp_rr.save()
-            else:
+            if not burps.is_valid():
                 return Response(burps.errors,
                     status=status.HTTP_400_BAD_REQUEST)
 
+            for pair in burps.validated_data['req_resp']:
+                burp_rr = BurpRawRequestResponse(
+                                finding=finding,
+                                burpRequestBase64=base64.b64encode(pair["request"].encode("utf-8")),
+                                burpResponseBase64=base64.b64encode(pair["response"].encode("utf-8")),
+                            )
+                burp_rr.clean()
+                burp_rr.save()
         burp_req_resp = BurpRawRequestResponse.objects.filter(finding=finding)
         burp_list = []
         for burp in burp_req_resp:
@@ -644,14 +658,13 @@ class FindingViewSet(prefetch.PrefetchListMixin,
         finding = self.get_object()
         if request.method == 'POST':
             new_note = serializers.AddNewNoteOptionSerializer(data=request.data)
-            if new_note.is_valid():
-                entry = new_note.validated_data['entry']
-                private = new_note.validated_data.get('private', False)
-                note_type = new_note.validated_data.get('note_type', None)
-            else:
+            if not new_note.is_valid():
                 return Response(new_note.errors,
                     status=status.HTTP_400_BAD_REQUEST)
 
+            entry = new_note.validated_data['entry']
+            private = new_note.validated_data.get('private', False)
+            note_type = new_note.validated_data.get('note_type', None)
             author = request.user
             note = Notes(entry=entry, author=author, private=private, note_type=note_type)
             note.save()
@@ -702,12 +715,11 @@ class FindingViewSet(prefetch.PrefetchListMixin,
         finding = self.get_object()
         if request.method == 'POST':
             new_file = serializers.FileSerializer(data=request.data)
-            if new_file.is_valid():
-                title = new_file.validated_data['title']
-                file = new_file.validated_data['file']
-            else:
+            if not new_file.is_valid():
                 return Response(new_file.errors, status=status.HTTP_400_BAD_REQUEST)
 
+            title = new_file.validated_data['title']
+            file = new_file.validated_data['file']
             file = FileUpload(title=title, file=file)
             file.save()
             finding.files.add(file)
@@ -734,14 +746,13 @@ class FindingViewSet(prefetch.PrefetchListMixin,
         """Remove Note From Finding Note"""
         finding = self.get_object()
         notes = finding.notes.all()
-        if request.data['note_id']:
-            note = get_object_or_404(Notes.objects, id=request.data['note_id'])
-            if note not in notes:
-                return Response({"error": "Selected Note is not assigned to this Finding"},
-                status=status.HTTP_400_BAD_REQUEST)
-        else:
+        if not request.data['note_id']:
             return Response({"error": "('note_id') parameter missing"},
                 status=status.HTTP_400_BAD_REQUEST)
+        note = get_object_or_404(Notes.objects, id=request.data['note_id'])
+        if note not in notes:
+            return Response({"error": "Selected Note is not assigned to this Finding"},
+            status=status.HTTP_400_BAD_REQUEST)
         if note.author.username == request.user.username or request.user.is_superuser:
             finding.notes.remove(note)
             note.delete()
@@ -767,28 +778,30 @@ class FindingViewSet(prefetch.PrefetchListMixin,
         """ Remove Tag(s) from finding list of tags """
         finding = self.get_object()
         delete_tags = serializers.TagSerializer(data=request.data)
-        if delete_tags.is_valid():
-            all_tags = finding.tags
-            all_tags = serializers.TagSerializer({"tags": all_tags}).data['tags']
-
-            # serializer turns it into a string, but we need a list
-            del_tags = tagulous.utils.parse_tags(delete_tags.validated_data['tags'])
-            if len(del_tags) < 1:
-                return Response({"error": "Empty Tag List Not Allowed"},
-                        status=status.HTTP_400_BAD_REQUEST)
-            for tag in del_tags:
-                if tag not in all_tags:
-                    return Response({"error": "'{}' is not a valid tag in list".format(tag)},
-                        status=status.HTTP_400_BAD_REQUEST)
-                all_tags.remove(tag)
-            new_tags = tagulous.utils.render_tags(all_tags)
-            finding.tags = new_tags
-            finding.save()
-            return Response({"success": "Tag(s) Removed"},
-                status=status.HTTP_204_NO_CONTENT)
-        else:
+        if not delete_tags.is_valid():
             return Response(delete_tags.errors,
                 status=status.HTTP_400_BAD_REQUEST)
+        all_tags = finding.tags
+        all_tags = serializers.TagSerializer({"tags": all_tags}).data['tags']
+
+        # serializer turns it into a string, but we need a list
+        del_tags = tagulous.utils.parse_tags(delete_tags.validated_data['tags'])
+        if len(del_tags) < 1:
+            return Response({"error": "Empty Tag List Not Allowed"},
+                    status=status.HTTP_400_BAD_REQUEST)
+        for tag in del_tags:
+            if tag not in all_tags:
+                return Response(
+                    {"error": f"'{tag}' is not a valid tag in list"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            all_tags.remove(tag)
+        new_tags = tagulous.utils.render_tags(all_tags)
+        finding.tags = new_tags
+        finding.save()
+        return Response({"success": "Tag(s) Removed"},
+            status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         responses={status.HTTP_200_OK: serializers.FindingSerializer(many=True)}
@@ -835,9 +848,11 @@ class FindingViewSet(prefetch.PrefetchListMixin,
     def set_finding_as_original(self, request, pk, new_fid):
         finding = self.get_object()
         success = set_finding_as_original_internal(request.user, pk, new_fid)
-        if not success:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return (
+            Response(status=status.HTTP_204_NO_CONTENT)
+            if success
+            else Response(status=status.HTTP_400_BAD_REQUEST)
+        )
 
     @extend_schema(
         request=serializers.ReportGenerateOptionSerializer,
@@ -850,17 +865,26 @@ class FindingViewSet(prefetch.PrefetchListMixin,
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def generate_report(self, request):
         findings = self.get_queryset()
-        options = {}
         # prepare post data
         report_options = serializers.ReportGenerateOptionSerializer(data=request.data)
-        if report_options.is_valid():
-            options['include_finding_notes'] = report_options.validated_data['include_finding_notes']
-            options['include_finding_images'] = report_options.validated_data['include_finding_images']
-            options['include_executive_summary'] = report_options.validated_data['include_executive_summary']
-            options['include_table_of_contents'] = report_options.validated_data['include_table_of_contents']
-        else:
+        if not report_options.is_valid():
             return Response(report_options.errors,
                 status=status.HTTP_400_BAD_REQUEST)
+
+        options = {
+            'include_finding_notes': report_options.validated_data[
+                'include_finding_notes'
+            ],
+            'include_finding_images': report_options.validated_data[
+                'include_finding_images'
+            ],
+            'include_executive_summary': report_options.validated_data[
+                'include_executive_summary'
+            ],
+            'include_table_of_contents': report_options.validated_data[
+                'include_table_of_contents'
+            ],
+        }
 
         data = report_generate(request, findings, options)
         report = serializers.ReportGenerateSerializer(data)
@@ -893,21 +917,20 @@ class FindingViewSet(prefetch.PrefetchListMixin,
     def _add_metadata(self, request, finding):
         metadata_data = serializers.FindingMetaSerializer(data=request.data)
 
-        if metadata_data.is_valid():
-            name = metadata_data.validated_data["name"]
-            value = metadata_data.validated_data["value"]
-
-            metadata = DojoMeta(finding=finding, name=name, value=value)
-            try:
-                metadata.validate_unique()
-                metadata.save()
-            except ValidationError:
-                return Response("Create failed probably because the name of the metadata already exists", status=status.HTTP_400_BAD_REQUEST)
-
-            return Response(data=metadata_data.data, status=status.HTTP_200_OK)
-        else:
+        if not metadata_data.is_valid():
             return Response(metadata_data.errors,
                 status=status.HTTP_400_BAD_REQUEST)
+        name = metadata_data.validated_data["name"]
+        value = metadata_data.validated_data["value"]
+
+        metadata = DojoMeta(finding=finding, name=name, value=value)
+        try:
+            metadata.validate_unique()
+            metadata.save()
+        except ValidationError:
+            return Response("Create failed probably because the name of the metadata already exists", status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(data=metadata_data.data, status=status.HTTP_200_OK)
 
     def _remove_metadata(self, request, finding):
         name = request.query_params.get("name", None)
@@ -1013,9 +1036,7 @@ class FindingViewSet(prefetch.PrefetchListMixin,
             return self._get_metadata(request, finding)
         elif request.method == "POST":
             return self._add_metadata(request, finding)
-        elif request.method == "PUT":
-            return self._edit_metadata(request, finding)
-        elif request.method == "PATCH":
+        elif request.method in ["PUT", "PATCH"]:
             return self._edit_metadata(request, finding)
         elif request.method == "DELETE":
             return self._remove_metadata(request, finding)
@@ -1237,17 +1258,26 @@ class ProductViewSet(prefetch.PrefetchListMixin,
     def generate_report(self, request, pk=None):
         product = self.get_object()
 
-        options = {}
         # prepare post data
         report_options = serializers.ReportGenerateOptionSerializer(data=request.data)
-        if report_options.is_valid():
-            options['include_finding_notes'] = report_options.validated_data['include_finding_notes']
-            options['include_finding_images'] = report_options.validated_data['include_finding_images']
-            options['include_executive_summary'] = report_options.validated_data['include_executive_summary']
-            options['include_table_of_contents'] = report_options.validated_data['include_table_of_contents']
-        else:
+        if not report_options.is_valid():
             return Response(report_options.errors,
                 status=status.HTTP_400_BAD_REQUEST)
+
+        options = {
+            'include_finding_notes': report_options.validated_data[
+                'include_finding_notes'
+            ],
+            'include_finding_images': report_options.validated_data[
+                'include_finding_images'
+            ],
+            'include_executive_summary': report_options.validated_data[
+                'include_executive_summary'
+            ],
+            'include_table_of_contents': report_options.validated_data[
+                'include_table_of_contents'
+            ],
+        }
 
         data = report_generate(request, product, options)
         report = serializers.ReportGenerateSerializer(data)
@@ -1414,17 +1444,26 @@ class ProductTypeViewSet(prefetch.PrefetchListMixin,
     def generate_report(self, request, pk=None):
         product_type = self.get_object()
 
-        options = {}
         # prepare post data
         report_options = serializers.ReportGenerateOptionSerializer(data=request.data)
-        if report_options.is_valid():
-            options['include_finding_notes'] = report_options.validated_data['include_finding_notes']
-            options['include_finding_images'] = report_options.validated_data['include_finding_images']
-            options['include_executive_summary'] = report_options.validated_data['include_executive_summary']
-            options['include_table_of_contents'] = report_options.validated_data['include_table_of_contents']
-        else:
+        if not report_options.is_valid():
             return Response(report_options.errors,
                 status=status.HTTP_400_BAD_REQUEST)
+
+        options = {
+            'include_finding_notes': report_options.validated_data[
+                'include_finding_notes'
+            ],
+            'include_finding_images': report_options.validated_data[
+                'include_finding_images'
+            ],
+            'include_executive_summary': report_options.validated_data[
+                'include_executive_summary'
+            ],
+            'include_table_of_contents': report_options.validated_data[
+                'include_table_of_contents'
+            ],
+        }
 
         data = report_generate(request, product_type, options)
         report = serializers.ReportGenerateSerializer(data)
@@ -1606,12 +1645,11 @@ class TestsViewSet(mixins.ListModelMixin,
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer_class(self):
-        if self.request and self.request.method == 'POST':
-            if self.action == 'accept_risks':
-                return ra_api.AcceptedRiskSerializer
-            return serializers.TestCreateSerializer
-        else:
+        if not self.request or self.request.method != 'POST':
             return serializers.TestSerializer
+        if self.action == 'accept_risks':
+            return ra_api.AcceptedRiskSerializer
+        return serializers.TestCreateSerializer
 
     @extend_schema(
         request=serializers.ReportGenerateOptionSerializer,
@@ -1625,17 +1663,26 @@ class TestsViewSet(mixins.ListModelMixin,
     def generate_report(self, request, pk=None):
         test = self.get_object()
 
-        options = {}
         # prepare post data
         report_options = serializers.ReportGenerateOptionSerializer(data=request.data)
-        if report_options.is_valid():
-            options['include_finding_notes'] = report_options.validated_data['include_finding_notes']
-            options['include_finding_images'] = report_options.validated_data['include_finding_images']
-            options['include_executive_summary'] = report_options.validated_data['include_executive_summary']
-            options['include_table_of_contents'] = report_options.validated_data['include_table_of_contents']
-        else:
+        if not report_options.is_valid():
             return Response(report_options.errors,
                 status=status.HTTP_400_BAD_REQUEST)
+
+        options = {
+            'include_finding_notes': report_options.validated_data[
+                'include_finding_notes'
+            ],
+            'include_finding_images': report_options.validated_data[
+                'include_finding_images'
+            ],
+            'include_executive_summary': report_options.validated_data[
+                'include_executive_summary'
+            ],
+            'include_table_of_contents': report_options.validated_data[
+                'include_table_of_contents'
+            ],
+        }
 
         data = report_generate(request, test, options)
         report = serializers.ReportGenerateSerializer(data)
@@ -1664,14 +1711,13 @@ class TestsViewSet(mixins.ListModelMixin,
         test = self.get_object()
         if request.method == 'POST':
             new_note = serializers.AddNewNoteOptionSerializer(data=request.data)
-            if new_note.is_valid():
-                entry = new_note.validated_data['entry']
-                private = new_note.validated_data.get('private', False)
-                note_type = new_note.validated_data.get('note_type', None)
-            else:
+            if not new_note.is_valid():
                 return Response(new_note.errors,
                     status=status.HTTP_400_BAD_REQUEST)
 
+            entry = new_note.validated_data['entry']
+            private = new_note.validated_data.get('private', False)
+            note_type = new_note.validated_data.get('note_type', None)
             author = request.user
             note = Notes(entry=entry, author=author, private=private, note_type=note_type)
             note.save()
@@ -1717,12 +1763,11 @@ class TestsViewSet(mixins.ListModelMixin,
         test = self.get_object()
         if request.method == 'POST':
             new_file = serializers.FileSerializer(data=request.data)
-            if new_file.is_valid():
-                title = new_file.validated_data['title']
-                file = new_file.validated_data['file']
-            else:
+            if not new_file.is_valid():
                 return Response(new_file.errors, status=status.HTTP_400_BAD_REQUEST)
 
+            title = new_file.validated_data['title']
+            file = new_file.validated_data['file']
             file = FileUpload(title=title, file=file)
             file.save()
             test.files.add(file)
@@ -1994,7 +2039,7 @@ class ImportScanView(mixins.CreateModelMixin,
         engagement = get_target_engagement_if_exists(engagement_id, engagement_name, product)
 
         # when using auto_create_context, the engagement or product may not have been created yet
-        jira_driver = engagement if engagement else product if product else None
+        jira_driver = engagement or product or None
         jira_project = jira_helper.get_jira_project(jira_driver) if jira_driver else None
 
         push_to_jira = serializer.validated_data.get('push_to_jira')
@@ -2136,7 +2181,7 @@ class ReImportScanView(mixins.CreateModelMixin,
         test = get_target_test_if_exists(test_id, test_title, scan_type, engagement)
 
         # when using auto_create_context, the engagement or product may not have been created yet
-        jira_driver = test if test else engagement if engagement else product if product else None
+        jira_driver = test or engagement or product or None
         jira_project = jira_helper.get_jira_project(jira_driver) if jira_driver else None
 
         push_to_jira = serializer.validated_data.get('push_to_jira')

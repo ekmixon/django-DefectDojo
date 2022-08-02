@@ -37,24 +37,33 @@ def delete_finding_group(request, fgid):
     finding_group = get_object_or_404(Finding_Group, pk=fgid)
     form = DeleteFindingGroupForm(instance=finding_group)
 
-    if request.method == 'POST':
-        if 'id' in request.POST and str(finding_group.id) == request.POST['id']:
-            form = DeleteFindingGroupForm(request.POST, instance=finding_group)
-            if form.is_valid():
-                product = finding_group.test.engagement.product
-                finding_group.delete()
-                messages.add_message(request,
-                                     messages.SUCCESS,
-                                     'Finding Group and relationships removed.',
-                                     extra_tags='alert-success')
+    if (
+        request.method == 'POST'
+        and 'id' in request.POST
+        and str(finding_group.id) == request.POST['id']
+    ):
+        form = DeleteFindingGroupForm(request.POST, instance=finding_group)
+        if form.is_valid():
+            product = finding_group.test.engagement.product
+            finding_group.delete()
+            messages.add_message(request,
+                                 messages.SUCCESS,
+                                 'Finding Group and relationships removed.',
+                                 extra_tags='alert-success')
 
-                create_notification(event='other',
-                                    title='Deletion of %s' % finding_group.name,
-                                    product=product,
-                                    description='The finding group "%s" was deleted by %s' % (finding_group.name, request.user),
-                                    url=request.build_absolute_uri(reverse('view_test', args=(finding_group.test.id,))),
-                                    icon="exclamation-triangle")
-                return HttpResponseRedirect(reverse('view_test', args=(finding_group.test.id,)))
+            create_notification(
+                event='other',
+                title=f'Deletion of {finding_group.name}',
+                product=product,
+                description='The finding group "%s" was deleted by %s'
+                % (finding_group.name, request.user),
+                url=request.build_absolute_uri(
+                    reverse('view_test', args=(finding_group.test.id,))
+                ),
+                icon="exclamation-triangle",
+            )
+
+            return HttpResponseRedirect(reverse('view_test', args=(finding_group.test.id,)))
 
     collector = NestedObjects(using=DEFAULT_DB_ALIAS)
     collector.collect([finding_group])

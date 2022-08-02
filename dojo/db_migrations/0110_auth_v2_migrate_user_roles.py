@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
         ('dojo', '0109_group_user_role'),
     ]
 
-    def migrate_users(apps, schema_editor):
+    def migrate_users(self, schema_editor):
         call_command('migrate_authorization_v2')
 
     operations = [

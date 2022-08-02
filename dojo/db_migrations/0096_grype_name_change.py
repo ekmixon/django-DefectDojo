@@ -2,20 +2,21 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-    def rename_grype_parser_name(apps, schema_editor):
-        test_type_model = apps.get_model('dojo', 'Test_Type')
+    def rename_grype_parser_name(self, schema_editor):
+        test_type_model = self.get_model('dojo', 'Test_Type')
 
-        # rename 'anchore_grype' to 'Anchore Grype'
-        grype_testtype = test_type_model.objects.filter(name='anchore_grype').first()
-        if grype_testtype:
+        if grype_testtype := test_type_model.objects.filter(
+            name='anchore_grype'
+        ).first():
             grype_testtype.name = 'Anchore Grype'
             grype_testtype.save()
 
-    def reverse_rename_grype_parser_name(apps, schema_editor):
-        test_type_model = apps.get_model('dojo', 'Test_Type')
+    def reverse_rename_grype_parser_name(self, schema_editor):
+        test_type_model = self.get_model('dojo', 'Test_Type')
 
-        grype_testtype = test_type_model.objects.filter(name='Anchore Grype').first()
-        if grype_testtype:
+        if grype_testtype := test_type_model.objects.filter(
+            name='Anchore Grype'
+        ).first():
             grype_testtype.name = 'anchore_grype'
             grype_testtype.save()
 

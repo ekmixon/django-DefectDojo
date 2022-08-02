@@ -106,10 +106,7 @@ def is_deduplication_on_engagement_mismatch(new_finding, to_duplicate_finding):
 
 
 def get_endpoints_as_url(finding):
-    list1 = []
-    for e in finding.endpoints.all():
-        list1.append(hyperlink.parse(str(e)))
-    return list1
+    return [hyperlink.parse(str(e)) for e in finding.endpoints.all()]
 
 
 def are_urls_equal(url1, url2, fields):
@@ -142,7 +139,10 @@ def are_urls_equal(url1, url2, fields):
             if url1.user != url2.user:
                 return False
         else:
-            logger.warning('Field ' + field + ' is not supported by the endpoint dedupe algorithm, ignoring it.')
+            logger.warning(
+                f'Field {field} is not supported by the endpoint dedupe algorithm, ignoring it.'
+            )
+
     return True
 
 
@@ -156,7 +156,10 @@ def are_endpoints_duplicates(new_finding, to_duplicate_finding):
     list1 = get_endpoints_as_url(new_finding)
     list2 = get_endpoints_as_url(to_duplicate_finding)
 
-    deduplicationLogger.debug("Starting deduplication by endpoint fields for finding {} with urls {} and finding {} with urls {}".format(new_finding.id, list1, to_duplicate_finding.id, list2))
+    deduplicationLogger.debug(
+        f"Starting deduplication by endpoint fields for finding {new_finding.id} with urls {list1} and finding {to_duplicate_finding.id} with urls {list2}"
+    )
+
     if list1 == [] and list2 == []:
         return True
 
@@ -182,10 +185,13 @@ def do_dedupe_finding(new_finding, *args, **kwargs):
         logger.warning("system settings not found")
         enabled = False
     if enabled:
-        deduplicationLogger.debug('dedupe for: ' + str(new_finding.id) +
-                    ":" + str(new_finding.title))
+        deduplicationLogger.debug(
+            (f'dedupe for: {str(new_finding.id)}' + ":")
+            + str(new_finding.title)
+        )
+
         deduplicationAlgorithm = new_finding.test.deduplication_algorithm
-        deduplicationLogger.debug('deduplication algorithm: ' + deduplicationAlgorithm)
+        deduplicationLogger.debug(f'deduplication algorithm: {deduplicationAlgorithm}')
         if deduplicationAlgorithm == settings.DEDUPE_ALGO_UNIQUE_ID_FROM_TOOL:
             deduplicate_unique_id_from_tool(new_finding)
         elif deduplicationAlgorithm == settings.DEDUPE_ALGO_HASH_CODE:
@@ -391,7 +397,10 @@ def set_duplicate(new_finding, existing_finding):
         raise Exception("Existing finding is a duplicate")
     if existing_finding.id == new_finding.id:
         raise Exception("Can not add duplicate to itself")
-    deduplicationLogger.debug('Setting new finding ' + str(new_finding.id) + ' as a duplicate of existing finding ' + str(existing_finding.id))
+    deduplicationLogger.debug(
+        f'Setting new finding {str(new_finding.id)} as a duplicate of existing finding {str(existing_finding.id)}'
+    )
+
     if is_duplicate_reopen(new_finding, existing_finding):
         set_duplicate_reopen(new_finding, existing_finding)
     new_finding.duplicate = True
@@ -413,10 +422,13 @@ def set_duplicate(new_finding, existing_finding):
 
 
 def is_duplicate_reopen(new_finding, existing_finding):
-    if (existing_finding.is_mitigated or existing_finding.mitigated) and not existing_finding.out_of_scope and not existing_finding.false_p and new_finding.active and not new_finding.is_mitigated:
-        return True
-    else:
-        return False
+    return bool(
+        (existing_finding.is_mitigated or existing_finding.mitigated)
+        and not existing_finding.out_of_scope
+        and not existing_finding.false_p
+        and new_finding.active
+        and not new_finding.is_mitigated
+    )
 
 
 def set_duplicate_reopen(new_finding, existing_finding):
@@ -434,8 +446,8 @@ def do_apply_rules(new_finding, *args, **kwargs):
     rules = Rule.objects.filter(applies_to='Finding', parent_rule=None)
     for rule in rules:
         child_val = True
-        child_list = [val for val in rule.child_rules.all()]
-        while (len(child_list) != 0):
+        child_list = list(rule.child_rules.all())
+        while child_list:
             child_val = child_val and child_rule(child_list.pop(), new_finding)
         if child_val:
             if rule.operator == 'Matches':
@@ -447,15 +459,14 @@ def do_apply_rules(new_finding, *args, **kwargs):
                         set_attribute_rule(new_finding, rule, rule.text)
                         new_finding.save(dedupe_option=False,
                                          rules_option=False)
-            else:
-                if rule.match_text in getattr(new_finding, rule.match_field):
-                    if rule.application == 'Append':
-                        set_attribute_rule(new_finding, rule, (getattr(
-                            new_finding, rule.applied_field) + rule.text))
-                    else:
-                        set_attribute_rule(new_finding, rule, rule.text)
-                        new_finding.save(dedupe_option=False,
-                                         rules_option=False)
+            elif rule.match_text in getattr(new_finding, rule.match_field):
+                if rule.application == 'Append':
+                    set_attribute_rule(new_finding, rule, (getattr(
+                        new_finding, rule.applied_field) + rule.text))
+                else:
+                    set_attribute_rule(new_finding, rule, rule.text)
+                    new_finding.save(dedupe_option=False,
+                                     rules_option=False)
 
 
 def set_attribute_rule(new_finding, rule, value):
@@ -469,15 +480,9 @@ def set_attribute_rule(new_finding, rule, value):
 
 def child_rule(rule, new_finding):
     if rule.operator == 'Matches':
-        if getattr(new_finding, rule.match_field) == rule.match_text:
-            return True
-        else:
-            return False
+        return getattr(new_finding, rule.match_field) == rule.match_text
     else:
-        if rule.match_text in getattr(new_finding, rule.match_field):
-            return True
-        else:
-            return False
+        return rule.match_text in getattr(new_finding, rule.match_field)
 
 
 def count_findings(findings):
@@ -485,35 +490,21 @@ def count_findings(findings):
     finding_count = {'low': 0, 'med': 0, 'high': 0, 'crit': 0}
     for f in findings:
         product = f.test.engagement.product
-        if product in product_count:
-            product_count[product][4] += 1
-            if f.severity == 'Low':
-                product_count[product][3] += 1
-                finding_count['low'] += 1
-            if f.severity == 'Medium':
-                product_count[product][2] += 1
-                finding_count['med'] += 1
-            if f.severity == 'High':
-                product_count[product][1] += 1
-                finding_count['high'] += 1
-            if f.severity == 'Critical':
-                product_count[product][0] += 1
-                finding_count['crit'] += 1
-        else:
+        if product not in product_count:
             product_count[product] = [0, 0, 0, 0, 0]
-            product_count[product][4] += 1
-            if f.severity == 'Low':
-                product_count[product][3] += 1
-                finding_count['low'] += 1
-            if f.severity == 'Medium':
-                product_count[product][2] += 1
-                finding_count['med'] += 1
-            if f.severity == 'High':
-                product_count[product][1] += 1
-                finding_count['high'] += 1
-            if f.severity == 'Critical':
-                product_count[product][0] += 1
-                finding_count['crit'] += 1
+        product_count[product][4] += 1
+        if f.severity == 'Critical':
+            product_count[product][0] += 1
+            finding_count['crit'] += 1
+        elif f.severity == 'High':
+            product_count[product][1] += 1
+            finding_count['high'] += 1
+        elif f.severity == 'Low':
+            product_count[product][3] += 1
+            finding_count['low'] += 1
+        elif f.severity == 'Medium':
+            product_count[product][2] += 1
+            finding_count['med'] += 1
     return product_count, finding_count
 
 
@@ -561,10 +552,10 @@ def findings_this_period(findings, period_type, stuff, o_stuff, a_stuff):
                     o_count['zero'] += 1
                 elif f.severity == 'High':
                     o_count['one'] += 1
-                elif f.severity == 'Medium':
-                    o_count['two'] += 1
                 elif f.severity == 'Low':
                     o_count['three'] += 1
+                elif f.severity == 'Medium':
+                    o_count['two'] += 1
             elif f.mitigated is None and f.date <= end_of_period.date():
                 if f.severity == 'Critical':
                     o_count['zero'] += 1
@@ -572,13 +563,13 @@ def findings_this_period(findings, period_type, stuff, o_stuff, a_stuff):
                 elif f.severity == 'High':
                     o_count['one'] += 1
                     a_count['one'] += 1
-                elif f.severity == 'Medium':
-                    o_count['two'] += 1
-                    a_count['two'] += 1
                 elif f.severity == 'Low':
                     o_count['three'] += 1
                     a_count['three'] += 1
 
+                elif f.severity == 'Medium':
+                    o_count['two'] += 1
+                    a_count['two'] += 1
         total = sum(o_count.values()) - o_count['closed']
         if period_type == 0:
             counts.append(
@@ -586,12 +577,16 @@ def findings_this_period(findings, period_type, stuff, o_stuff, a_stuff):
                 end_of_period.strftime("%b %d"))
         else:
             counts.append(start_of_period.strftime("%b %Y"))
-        counts.append(o_count['zero'])
-        counts.append(o_count['one'])
-        counts.append(o_count['two'])
-        counts.append(o_count['three'])
-        counts.append(total)
-        counts.append(o_count['closed'])
+        counts.extend(
+            (
+                o_count['zero'],
+                o_count['one'],
+                o_count['two'],
+                o_count['three'],
+                total,
+                o_count['closed'],
+            )
+        )
 
         stuff.append(counts)
         o_stuff.append(counts[:-1])
@@ -604,11 +599,16 @@ def findings_this_period(findings, period_type, stuff, o_stuff, a_stuff):
                 end_of_period.strftime("%b %d"))
         else:
             a_counts.append(start_of_period.strftime("%b %Y"))
-        a_counts.append(a_count['zero'])
-        a_counts.append(a_count['one'])
-        a_counts.append(a_count['two'])
-        a_counts.append(a_count['three'])
-        a_counts.append(a_total)
+        a_counts.extend(
+            (
+                a_count['zero'],
+                a_count['one'],
+                a_count['two'],
+                a_count['three'],
+                a_total,
+            )
+        )
+
         a_stuff.append(a_counts)
 
 
@@ -676,9 +676,8 @@ def add_breadcrumb(parent=None,
                             crumbs = crumbs[:crumbs.index(crumb)]
                         else:
                             obj_crumbs.remove(obj_crumb)
-                    else:
-                        if crumb in crumbs:
-                            crumbs = crumbs[:crumbs.index(crumb)]
+                    elif crumb in crumbs:
+                        crumbs = crumbs[:crumbs.index(crumb)]
 
         crumbs += obj_crumbs
 
@@ -694,11 +693,7 @@ def is_title_in_breadcrumbs(title):
     if breadcrumbs is None:
         return False
 
-    for breadcrumb in breadcrumbs:
-        if breadcrumb.get('title') == title:
-            return True
-
-    return False
+    return any(breadcrumb.get('title') == title for breadcrumb in breadcrumbs)
 
 
 def get_punchcard_data(objs, start_date, weeks, view='Finding'):

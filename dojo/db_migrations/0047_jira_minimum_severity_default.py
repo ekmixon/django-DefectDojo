@@ -5,8 +5,8 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
-    def set_default_to_low(apps, schema_editor):
-        system_settings = apps.get_model('dojo', 'system_settings')
+    def set_default_to_low(self, schema_editor):
+        system_settings = self.get_model('dojo', 'system_settings')
         try:
             ss = system_settings.objects.all().first()
             jira_sev_value = ss.jira_minimum_severity

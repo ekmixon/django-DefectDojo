@@ -114,7 +114,7 @@ class UniqueUploadNameProvider:
 
     def __call__(self, model_instance, filename):
         base, ext = os.path.splitext(filename)
-        filename = "%s_%s" % (base, uuid4()) if self.keep_basename else str(uuid4())
+        filename = f"{base}_{uuid4()}" if self.keep_basename else str(uuid4())
         if self.keep_ext:
             filename += ext
         if self.directory is None:
@@ -149,7 +149,7 @@ class Regulation(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        return self.acronym + ' (' + self.jurisdiction + ')'
+        return f'{self.acronym} ({self.jurisdiction})'
 
 
 User = get_user_model()
@@ -176,24 +176,22 @@ class Dojo_User(User):
     def force_password_reset(user):
         return hasattr(user, 'usercontactinfo') and user.usercontactinfo.force_password_reset
 
-    def disable_force_password_reset(user):
-        if hasattr(user, 'usercontactinfo'):
-            user.usercontactinfo.force_password_reset = False
-            user.usercontactinfo.save()
+    def disable_force_password_reset(self):
+        if hasattr(self, 'usercontactinfo'):
+            self.usercontactinfo.force_password_reset = False
+            self.usercontactinfo.save()
 
-    def enable_force_password_reset(user):
-        if hasattr(user, 'usercontactinfo'):
-            user.usercontactinfo.force_password_reset = True
-            user.usercontactinfo.save()
+    def enable_force_password_reset(self):
+        if hasattr(self, 'usercontactinfo'):
+            self.usercontactinfo.force_password_reset = True
+            self.usercontactinfo.save()
 
     @staticmethod
     def generate_full_name(user):
         """
         Returns the first_name plus the last_name, with a space in between.
         """
-        full_name = '%s %s (%s)' % (user.first_name,
-                                    user.last_name,
-                                    user.username)
+        full_name = f'{user.first_name} {user.last_name} ({user.username})'
         return full_name.strip()
 
 
@@ -626,15 +624,12 @@ class Product_Type(models.Model):
         health = 100
         if c_findings.count() > 0:
             health = 40
-            health = health - ((c_findings.count() - 1) * 5)
+            health -= (c_findings.count() - 1) * 5
         if h_findings.count() > 0:
             if health == 100:
                 health = 60
-            health = health - ((h_findings.count() - 1) * 2)
-        if health < 5:
-            return 5
-        else:
-            return health
+            health -= (h_findings.count() - 1) * 2
+        return max(health, 5)
 
     # only used by bulk risk acceptance api
     @property
@@ -648,9 +643,12 @@ class Product_Type(models.Model):
         return self.name
 
     def get_breadcrumbs(self):
-        bc = [{'title': str(self),
-               'url': reverse('edit_product_type', args=(self.id,))}]
-        return bc
+        return [
+            {
+                'title': str(self),
+                'url': reverse('edit_product_type', args=(self.id,)),
+            }
+        ]
 
     def get_absolute_url(self):
         from django.urls import reverse
@@ -682,9 +680,7 @@ class Test_Type(models.Model):
         ordering = ('name',)
 
     def get_breadcrumbs(self):
-        bc = [{'title': str(self),
-               'url': None}]
-        return bc
+        return [{'title': str(self), 'url': None}]
 
 
 class DojoMeta(models.Model):
@@ -714,11 +710,7 @@ class DojoMeta(models.Model):
         ids = [self.product_id,
                self.endpoint_id,
                self.finding_id]
-        ids_count = 0
-
-        for id in ids:
-            if id is not None:
-                ids_count += 1
+        ids_count = sum(id is not None for id in ids)
 
         if ids_count == 0:
             raise ValidationError('Metadata entries need either a product, an endpoint or a finding')
@@ -726,7 +718,7 @@ class DojoMeta(models.Model):
             raise ValidationError('Metadata entries may not have more than one relation, either a product, an endpoint either or a finding')
 
     def __str__(self):
-        return "%s: %s" % (self.name, self.value)
+        return f"{self.name}: {self.value}"
 
     class Meta:
         unique_together = (('product', 'name'),
@@ -873,53 +865,52 @@ class Product(models.Model):
     def open_findings(self, start_date=None, end_date=None):
         if start_date is None or end_date is None:
             return {}
-        else:
-            critical = Finding.objects.filter(test__engagement__product=self,
-                                              mitigated__isnull=True,
-                                              verified=True,
-                                              false_p=False,
-                                              duplicate=False,
-                                              out_of_scope=False,
-                                              severity="Critical",
-                                              date__range=[start_date,
-                                                           end_date]).count()
-            high = Finding.objects.filter(test__engagement__product=self,
+        critical = Finding.objects.filter(test__engagement__product=self,
                                           mitigated__isnull=True,
                                           verified=True,
                                           false_p=False,
                                           duplicate=False,
                                           out_of_scope=False,
-                                          severity="High",
+                                          severity="Critical",
                                           date__range=[start_date,
                                                        end_date]).count()
-            medium = Finding.objects.filter(test__engagement__product=self,
-                                            mitigated__isnull=True,
-                                            verified=True,
-                                            false_p=False,
-                                            duplicate=False,
-                                            out_of_scope=False,
-                                            severity="Medium",
-                                            date__range=[start_date,
-                                                         end_date]).count()
-            low = Finding.objects.filter(test__engagement__product=self,
-                                         mitigated__isnull=True,
-                                         verified=True,
-                                         false_p=False,
-                                         duplicate=False,
-                                         out_of_scope=False,
-                                         severity="Low",
-                                         date__range=[start_date,
-                                                      end_date]).count()
-            return {'Critical': critical,
-                    'High': high,
-                    'Medium': medium,
-                    'Low': low,
-                    'Total': (critical + high + medium + low)}
+        high = Finding.objects.filter(test__engagement__product=self,
+                                      mitigated__isnull=True,
+                                      verified=True,
+                                      false_p=False,
+                                      duplicate=False,
+                                      out_of_scope=False,
+                                      severity="High",
+                                      date__range=[start_date,
+                                                   end_date]).count()
+        medium = Finding.objects.filter(test__engagement__product=self,
+                                        mitigated__isnull=True,
+                                        verified=True,
+                                        false_p=False,
+                                        duplicate=False,
+                                        out_of_scope=False,
+                                        severity="Medium",
+                                        date__range=[start_date,
+                                                     end_date]).count()
+        low = Finding.objects.filter(test__engagement__product=self,
+                                     mitigated__isnull=True,
+                                     verified=True,
+                                     false_p=False,
+                                     duplicate=False,
+                                     out_of_scope=False,
+                                     severity="Low",
+                                     date__range=[start_date,
+                                                  end_date]).count()
+        return {'Critical': critical,
+                'High': high,
+                'Medium': medium,
+                'Low': low,
+                'Total': (critical + high + medium + low)}
 
     def get_breadcrumbs(self):
-        bc = [{'title': str(self),
-               'url': reverse('view_product', args=(self.id,))}]
-        return bc
+        return [
+            {'title': str(self), 'url': reverse('view_product', args=(self.id,))}
+        ]
 
     @property
     def get_product_type(self):
@@ -931,10 +922,7 @@ class Product(models.Model):
         findings = Finding.objects.filter(test__engagement__product=self,
                                           active=True,
                                           )
-        findings_list = []
-        for i in findings:
-            findings_list.append(i.id)
-        return findings_list
+        return [i.id for i in findings]
 
     @property
     def has_jira_configured(self):
@@ -1161,22 +1149,17 @@ class Engagement(models.Model):
         ]
 
     def is_overdue(self):
-        if self.engagement_type == 'CI/CD':
-            overdue_grace_days = 10
-        else:
-            overdue_grace_days = 0
-
+        overdue_grace_days = 10 if self.engagement_type == 'CI/CD' else 0
         max_end_date = timezone.now() - relativedelta(days=overdue_grace_days)
 
-        if self.target_end < max_end_date.date():
-            return True
-
-        return False
+        return self.target_end < max_end_date.date()
 
     def __str__(self):
-        return "Engagement %i: %s (%s)" % (self.id if id else 0, self.name if self.name else '',
-                                        self.target_start.strftime(
-                                            "%b %d, %Y"))
+        return "Engagement %i: %s (%s)" % (
+            self.id if id else 0,
+            self.name or '',
+            self.target_start.strftime("%b %d, %Y"),
+        )
 
     def get_breadcrumbs(self):
         bc = self.product.get_breadcrumbs()
@@ -1247,12 +1230,13 @@ class Endpoint_Status(models.Model):
         else:
             diff = get_current_date() - self.date.date()
         days = diff.days
-        return days if days > 0 else 0
+        return max(days, 0)
 
     def __str__(self):
-        field_values = []
-        for field in self._meta.get_fields():
-            field_values.append(str(getattr(self, field.name, '')))
+        field_values = [
+            getattr(self, field.name, '') for field in self._meta.get_fields()
+        ]
+
         return ' '.join(field_values)
 
     class Meta:

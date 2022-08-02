@@ -163,42 +163,81 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    #  Django Rest Framework API v2
-    url(r'^%sapi/v2/' % get_system_setting('url_prefix'), include(v2_api.urls)),
-    # action history
-    url(r'^%shistory/(?P<cid>\d+)/(?P<oid>\d+)$' % get_system_setting('url_prefix'), views.action_history,
-        name='action_history'),
-    url(r'^%s' % get_system_setting('url_prefix'), include(ur)),
-    url(r'^%sapi/v2/api-token-auth/' % get_system_setting('url_prefix'), tokenviews.obtain_auth_token, name='api-token-auth'),
-    url(r'^%sapi/v2/user_profile/' % get_system_setting('url_prefix'), UserProfileView.as_view(), name='user_profile'),
-
-    # drf-yasg = OpenAPI2
-    url(r'^%sapi/v2/doc/' % get_system_setting('url_prefix'), schema_view.with_ui('swagger', cache_timeout=0), name='api_v2_schema'),
-
-    # drf-spectacular = OpenAPI3
-    url(r'^%sapi/v2/oa3/schema/' % get_system_setting('url_prefix'), SpectacularAPIView.as_view(), name='schema_oa3'),
-    url(r'^%sapi/v2/oa3/swagger-ui/' % get_system_setting('url_prefix'), SpectacularSwaggerView.as_view(url=get_system_setting('url_prefix') + '/api/v2/oa3/schema/?format=json'), name='swagger-ui_oa3'),
-
-    url(r'^robots.txt', lambda x: HttpResponse("User-Agent: *\nDisallow: /", content_type="text/plain"), name="robots_file"),
-    url(r'^manage_files/(?P<oid>\d+)/(?P<obj_type>\w+)$', views.manage_files, name='manage_files'),
-
+    url(f"^{get_system_setting('url_prefix')}api/v2/", include(v2_api.urls)),
+    url(
+        r'^%shistory/(?P<cid>\d+)/(?P<oid>\d+)$'
+        % get_system_setting('url_prefix'),
+        views.action_history,
+        name='action_history',
+    ),
+    url(f"^{get_system_setting('url_prefix')}", include(ur)),
+    url(
+        f"^{get_system_setting('url_prefix')}api/v2/api-token-auth/",
+        tokenviews.obtain_auth_token,
+        name='api-token-auth',
+    ),
+    url(
+        f"^{get_system_setting('url_prefix')}api/v2/user_profile/",
+        UserProfileView.as_view(),
+        name='user_profile',
+    ),
+    url(
+        f"^{get_system_setting('url_prefix')}api/v2/doc/",
+        schema_view.with_ui('swagger', cache_timeout=0),
+        name='api_v2_schema',
+    ),
+    url(
+        f"^{get_system_setting('url_prefix')}api/v2/oa3/schema/",
+        SpectacularAPIView.as_view(),
+        name='schema_oa3',
+    ),
+    url(
+        f"^{get_system_setting('url_prefix')}api/v2/oa3/swagger-ui/",
+        SpectacularSwaggerView.as_view(
+            url=get_system_setting('url_prefix')
+            + '/api/v2/oa3/schema/?format=json'
+        ),
+        name='swagger-ui_oa3',
+    ),
+    url(
+        r'^robots.txt',
+        lambda x: HttpResponse(
+            "User-Agent: *\nDisallow: /", content_type="text/plain"
+        ),
+        name="robots_file",
+    ),
+    url(
+        r'^manage_files/(?P<oid>\d+)/(?P<obj_type>\w+)$',
+        views.manage_files,
+        name='manage_files',
+    ),
 ]
+
 
 urlpatterns += survey_urls
 
-if hasattr(settings, 'DJANGO_METRICS_ENABLED'):
-    if settings.DJANGO_METRICS_ENABLED:
-        urlpatterns += [url(r'^%sdjango_metrics/' % get_system_setting('url_prefix'), include('django_prometheus.urls'))]
+if (
+    hasattr(settings, 'DJANGO_METRICS_ENABLED')
+    and settings.DJANGO_METRICS_ENABLED
+):
+    urlpatterns += [
+        url(
+            f"^{get_system_setting('url_prefix')}django_metrics/",
+            include('django_prometheus.urls'),
+        )
+    ]
 
-if hasattr(settings, 'SAML2_ENABLED'):
-    if settings.SAML2_ENABLED:
-        # django saml2
-        urlpatterns += [url(r'^saml2/', include('djangosaml2.urls'))]
 
-if hasattr(settings, 'DJANGO_ADMIN_ENABLED'):
-    if settings.DJANGO_ADMIN_ENABLED:
+if hasattr(settings, 'SAML2_ENABLED') and settings.SAML2_ENABLED:
+    # django saml2
+    urlpatterns += [url(r'^saml2/', include('djangosaml2.urls'))]
+
+if hasattr(settings, 'DJANGO_ADMIN_ENABLED') and settings.DJANGO_ADMIN_ENABLED:
         #  django admin
-        urlpatterns += [url(r'^%sadmin/' % get_system_setting('url_prefix'), admin.site.urls)]
+    urlpatterns += [
+        url(f"^{get_system_setting('url_prefix')}admin/", admin.site.urls)
+    ]
+
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

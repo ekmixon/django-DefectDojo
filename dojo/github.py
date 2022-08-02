@@ -37,9 +37,9 @@ def reopen_external_issue_github(find, note, prod, eng):
         issue = repo.get_issue(int(g_issue.issue_id))
     except:
         e = sys.exc_info()[0]
-        logger.error('cannot update finding in github: ' + e)
+        logger.error(f'cannot update finding in github: {e}')
 
-    logger.info('Will close github issue ' + g_issue.issue_id)
+    logger.info(f'Will close github issue {g_issue.issue_id}')
     issue.edit(state='open')
     issue.create_comment(note)
 
@@ -68,9 +68,9 @@ def close_external_issue_github(find, note, prod, eng):
         issue = repo.get_issue(int(g_issue.issue_id))
     except:
         e = sys.exc_info()[0]
-        logger.error('cannot update finding in github: ' + e)
+        logger.error(f'cannot update finding in github: {e}')
 
-    logger.info('Will close github issue ' + g_issue.issue_id)
+    logger.info(f'Will close github issue {g_issue.issue_id}')
     issue.edit(state='closed')
     issue.create_comment(note)
 
@@ -97,10 +97,15 @@ def update_external_issue_github(find, prod, eng):
         g_ctx = Github(github_conf.api_key)
         repo = g_ctx.get_repo(github_product.git_project)
         issue = repo.get_issue(int(g_issue.issue_id))
-        issue.edit(title=find.title, body=github_body(find), labels=["defectdojo", "security / " + find.severity])
+        issue.edit(
+            title=find.title,
+            body=github_body(find),
+            labels=["defectdojo", f"security / {find.severity}"],
+        )
+
     except:
         e = sys.exc_info()[0]
-        logger.error('cannot update finding in github: ' + e)
+        logger.error(f'cannot update finding in github: {e}')
 
 
 def add_external_issue_github(find, prod, eng):
@@ -126,26 +131,33 @@ def add_external_issue_github(find, prod, eng):
         eng = Engagement.objects.get(test=find.test)
         prod = Product.objects.get(engagement=eng)
         github_product_key = GITHUB_PKey.objects.get(product=prod)
-        logger.info('Create issue with github profile: ' + str(github_conf) + ' on product: ' + str(github_product_key))
+        logger.info(
+            f'Create issue with github profile: {str(github_conf)} on product: {str(github_product_key)}'
+        )
+
 
         try:
             g = Github(github_conf.api_key)
             user = g.get_user()
-            logger.debug('logged in with github user: ' + user.login)
-            logger.debug('Look for project: ' + github_product_key.git_project)
+            logger.debug(f'logged in with github user: {user.login}')
+            logger.debug(f'Look for project: {github_product_key.git_project}')
             repo = g.get_repo(github_product_key.git_project)
-            logger.debug('Found repo: ' + str(repo.url))
-            issue = repo.create_issue(title=find.title, body=github_body(find), labels=["defectdojo", "security / " + find.severity])
-            logger.debug('created issue: ' + str(issue.html_url))
+            logger.debug(f'Found repo: {str(repo.url)}')
+            issue = repo.create_issue(
+                title=find.title,
+                body=github_body(find),
+                labels=["defectdojo", f"security / {find.severity}"],
+            )
+
+            logger.debug(f'created issue: {str(issue.html_url)}')
             g_issue = GITHUB_Issue(issue_id=issue.number, issue_url=issue.html_url, finding=find)
             g_issue.save()
         except:
             e = sys.exc_info()[0]
-            logger.error('cannot create finding in github: ' + e)
+            logger.error(f'cannot create finding in github: {e}')
 
 
 def github_body(find):
     template = 'issue-trackers/jira_full/jira-description.tpl'
-    kwargs = {}
-    kwargs['finding'] = find
+    kwargs = {'finding': find}
     return render_to_string(template, kwargs)

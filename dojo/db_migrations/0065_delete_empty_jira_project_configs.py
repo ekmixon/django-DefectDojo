@@ -12,11 +12,11 @@ class Migration(migrations.Migration):
         ('dojo', '0064_jira_refactor_populate'),
     ]
 
-    def delete_empty_jira_project_configs(apps, schema_editor):
+    def delete_empty_jira_project_configs(self, schema_editor):
         logger.info('removing JIRA_Projects with empty instance and empty project key created due to bugs in 1.10.0')
         logger.info('details in https://github.com/DefectDojo/django-DefectDojo/issues/3354')
         # querying on null or blank or whatever can get the wrong results, so just iterate over all configs to be reliable
-        JIRA_Project = apps.get_model('dojo', 'JIRA_Project')
+        JIRA_Project = self.get_model('dojo', 'JIRA_Project')
         for jira_project in JIRA_Project.objects.all():
             if not jira_project.jira_instance and not jira_project.project_key:
                 product = jira_project.product

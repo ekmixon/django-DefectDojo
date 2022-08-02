@@ -41,9 +41,9 @@ class LoginRequiredMiddleware:
             path = request.path_info.lstrip('/')
             if not any(m.match(path) for m in EXEMPT_URLS):
                 if path == 'logout':
-                    fullURL = "%s?next=%s" % (settings.LOGIN_URL, '/')
+                    fullURL = f"{settings.LOGIN_URL}?next=/"
                 else:
-                    fullURL = "%s?next=%s" % (settings.LOGIN_URL, urlquote(request.get_full_path()))
+                    fullURL = f"{settings.LOGIN_URL}?next={urlquote(request.get_full_path())}"
                 return HttpResponseRedirect(fullURL)
 
         if request.user.is_authenticated:
@@ -60,8 +60,7 @@ class LoginRequiredMiddleware:
             if Dojo_User.force_password_reset(request.user) and path != 'change_password':
                 return HttpResponseRedirect(reverse('change_password'))
 
-        response = self.get_response(request)
-        return response
+        return self.get_response(request)
 
 
 class DojoSytemSettingsMiddleware(object):
@@ -123,8 +122,4 @@ class System_Settings_Manager(models.Manager):
 
         from_cache = DojoSytemSettingsMiddleware.get_system_settings()
 
-        if not from_cache:
-            # logger.debug('no cached value found, loading system settings from db')
-            return self.get_from_db(*args, **kwargs)
-
-        return from_cache
+        return from_cache or self.get_from_db(*args, **kwargs)

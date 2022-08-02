@@ -49,7 +49,7 @@ EARLIEST_FINDING = None
 
 def custom_filter(queryset, name, value):
     values = value.split(',')
-    filter = ('%s__in' % (name))
+    filter = f'{name}__in'
     return queryset.filter(Q(**{filter: values}))
 
 
@@ -69,7 +69,7 @@ def vulnerability_id_filter(queryset, name, value):
 
 
 def now():
-    return local_tz.localize(datetime.today())
+    return local_tz.localize(datetime.now())
 
 
 class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):
@@ -153,7 +153,7 @@ def get_earliest_finding(queryset=None):
 
 
 def cwe_options(queryset):
-    cwe = dict()
+    cwe = {}
     cwe = dict([cwe, cwe]
                 for cwe in queryset.order_by().values_list('cwe', flat=True).distinct()
                 if type(cwe) is int and cwe is not None and cwe > 0)
@@ -176,14 +176,14 @@ class DojoFilter(FilterSet):
                 # and form.js would then apply select2 multiple times, resulting in duplicated fields
                 # the initialization now happens in filter_js_snippet.html
                 self.form.fields[field].widget.tag_options = \
-                    self.form.fields[field].widget.tag_options + tagulous.models.options.TagOptions(autocomplete_settings={'width': '200px', 'defer': True})
+                        self.form.fields[field].widget.tag_options + tagulous.models.options.TagOptions(autocomplete_settings={'width': '200px', 'defer': True})
                 tagged_model, exclude = get_tags_model_from_field_name(field)
                 if tagged_model:  # only if not the normal tags field
                     self.form.fields[field].label = get_tags_label_from_model(tagged_model)
                     self.form.fields[field].autocomplete_tags = tagged_model.tags.tag_model.objects.all().order_by('name')
 
                 if exclude:
-                    self.form.fields[field].label = 'Not ' + self.form.fields[field].label
+                    self.form.fields[field].label = f'Not {self.form.fields[field].label}'
 
 
 def get_tags_model_from_field_name(field):
@@ -194,16 +194,13 @@ def get_tags_model_from_field_name(field):
     try:
         parts = field.split('__')
         model_name = parts[-2]
-        return apps.get_model('dojo.%s' % model_name, require_ready=True), exclude
+        return apps.get_model(f'dojo.{model_name}', require_ready=True), exclude
     except Exception as e:
         return None, exclude
 
 
 def get_tags_label_from_model(model):
-    if model:
-        return 'Tags (%s)' % model.__name__.title()
-    else:
-        return 'Tags (Unknown)'
+    return f'Tags ({model.__name__.title()})' if model else 'Tags (Unknown)'
 
 
 def get_finding_filter_fields(metrics=False, similar=False):
@@ -484,26 +481,25 @@ class MetricsDateRangeFilter(ChoiceFilter):
         self.start_date = local_tz.localize(
             datetime(now().year, now().month, 1, 0, 0, 0))
         self.end_date = now()
-        return qs.filter(**{
-            '%s__year' % name: self.start_date.year,
-            '%s__month' % name: self.start_date.month
-        })
+        return qs.filter(
+            **{
+                f'{name}__year': self.start_date.year,
+                f'{name}__month': self.start_date.month,
+            }
+        )
 
     def current_year(self, qs, name):
         self.start_date = local_tz.localize(
             datetime(now().year, 1, 1, 0, 0, 0))
         self.end_date = now()
-        return qs.filter(**{
-            '%s__year' % name: now().year,
-        })
+        return qs.filter(**{f'{name}__year': now().year})
 
     def past_x_days(self, qs, name, days):
         self.start_date = _truncate(now() - timedelta(days=days))
         self.end_date = _truncate(now() + timedelta(days=1))
-        return qs.filter(**{
-            '%s__gte' % name: self.start_date,
-            '%s__lt' % name: self.end_date,
-        })
+        return qs.filter(
+            **{f'{name}__gte': self.start_date, f'{name}__lt': self.end_date}
+        )
 
     def past_seven_days(self, qs, name):
         return self.past_x_days(qs, name, 7)
@@ -1388,7 +1384,13 @@ class SimilarFindingFilter(FindingFilter):
         super().__init__(data, *args, **kwargs)
 
         if self.finding and self.finding.hash_code:
-            self.form.fields['hash_code'] = forms.MultipleChoiceField(choices=[(self.finding.hash_code, self.finding.hash_code[:24] + '...')], required=False, initial=[])
+            self.form.fields['hash_code'] = forms.MultipleChoiceField(
+                choices=[
+                    (self.finding.hash_code, f'{self.finding.hash_code[:24]}...')
+                ],
+                required=False,
+                initial=[],
+            )
 
     def filter_queryset(self, *args, **kwargs):
         queryset = super().filter_queryset(*args, **kwargs)
@@ -1520,11 +1522,13 @@ class MetricsFindingFilter(FindingFilter):
     not_tag = CharFilter(field_name='tags__name', lookup_expr='icontains', label='Not tag name contains', exclude=True)
 
     def __init__(self, *args, **kwargs):
-        if args[0]:
-            if args[0].get('start_date', '') != '' or args[0].get('end_date', '') != '':
-                args[0]._mutable = True
-                args[0]['date'] = 8
-                args[0]._mutable = False
+        if args[0] and (
+            args[0].get('start_date', '') != ''
+            or args[0].get('end_date', '') != ''
+        ):
+            args[0]._mutable = True
+            args[0]['date'] = 8
+            args[0]._mutable = False
 
         super().__init__(*args, **kwargs)
 
@@ -1608,11 +1612,13 @@ class MetricsEndpointFilter(FilterSet):
     tag = CharFilter(field_name='tags__name', lookup_expr='icontains', label='Tag name contains')
 
     def __init__(self, *args, **kwargs):
-        if args[0]:
-            if args[0].get('start_date', '') != '' or args[0].get('end_date', '') != '':
-                args[0]._mutable = True
-                args[0]['date'] = 8
-                args[0]._mutable = False
+        if args[0] and (
+            args[0].get('start_date', '') != ''
+            or args[0].get('end_date', '') != ''
+        ):
+            args[0]._mutable = True
+            args[0]['date'] = 8
+            args[0]._mutable = False
 
         self.pid = None
         if 'pid' in kwargs:

@@ -38,10 +38,7 @@ def configure_google_sheets(request):
         initial = {}
         for field in fields:
             initial[field.name] = column_details[field.name][0]
-            if column_details[field.name][1] == 0:
-                initial['Protect ' + field.name] = False
-            else:
-                initial['Protect ' + field.name] = True
+            initial[f'Protect {field.name}'] = column_details[field.name][1] != 0
         initial['drive_folder_ID'] = system_settings.drive_folder_ID
         initial['email_address'] = system_settings.email_address
         initial['enable_service'] = system_settings.enable_google_sheets
@@ -68,57 +65,55 @@ def configure_google_sheets(request):
                     extra_tags="alert-success",)
             return HttpResponseRedirect(reverse('dashboard'))
 
-        if request.POST.get('update'):
-            if form.is_valid():
-                # Create a dictionary object from the uploaded credentials file
-                if len(request.FILES) != 0:
-                    cred_file = request.FILES['cred_file']
-                    cred_byte = cred_file.read()                          # read data from the temporary uploaded file
-                    cred_str = cred_byte.decode('utf8')                 # convert bytes object to string
-                    initial = True
-                else:
-                    cred_str = system_settings.credentials
-                    initial = False
+        if request.POST.get('update') and form.is_valid():
+            # Create a dictionary object from the uploaded credentials file
+            if len(request.FILES) != 0:
+                cred_file = request.FILES['cred_file']
+                cred_byte = cred_file.read()                          # read data from the temporary uploaded file
+                cred_str = cred_byte.decode('utf8')                 # convert bytes object to string
+                initial = True
+            else:
+                cred_str = system_settings.credentials
+                initial = False
 
-                # Get the drive folder ID
-                drive_folder_ID = form.cleaned_data['drive_folder_ID']
-                validate_inputs = validate_drive_authentication(request, cred_str, drive_folder_ID)
-
-                if validate_inputs:
-                    # Create a dictionary of column names and widths
-                    column_widths = {}
-                    for i in fields:
-                        column_widths[i.name] = []
-                        column_widths[i.name].append(form.cleaned_data[i.name])
-                        if form.cleaned_data['Protect ' + i.name]:
-                            column_widths[i.name].append(1)
-                        else:
-                            column_widths[i.name].append(0)
-
-                    system_settings.column_widths = column_widths
-                    system_settings.credentials = cred_str
-                    system_settings.drive_folder_ID = drive_folder_ID
-                    system_settings.email_address = form.cleaned_data['email_address']
-                    system_settings.enable_google_sheets = form.cleaned_data['enable_service']
-                    system_settings.save()
-                    if initial:
-                        messages.add_message(
-                            request,
-                            messages.SUCCESS,
-                            "Google Drive configuration saved successfully.",
-                            extra_tags="alert-success",
-                        )
+            # Get the drive folder ID
+            drive_folder_ID = form.cleaned_data['drive_folder_ID']
+            if validate_inputs := validate_drive_authentication(
+                request, cred_str, drive_folder_ID
+            ):
+                # Create a dictionary of column names and widths
+                column_widths = {}
+                for i in fields:
+                    column_widths[i.name] = [form.cleaned_data[i.name]]
+                    if form.cleaned_data[f'Protect {i.name}']:
+                        column_widths[i.name].append(1)
                     else:
-                        messages.add_message(
-                            request,
-                            messages.SUCCESS,
-                            "Google Drive configuration updated successfully.",
-                            extra_tags="alert-success",
-                        )
-                    return HttpResponseRedirect(reverse('dashboard'))
+                        column_widths[i.name].append(0)
+
+                system_settings.column_widths = column_widths
+                system_settings.credentials = cred_str
+                system_settings.drive_folder_ID = drive_folder_ID
+                system_settings.email_address = form.cleaned_data['email_address']
+                system_settings.enable_google_sheets = form.cleaned_data['enable_service']
+                system_settings.save()
+                if initial:
+                    messages.add_message(
+                        request,
+                        messages.SUCCESS,
+                        "Google Drive configuration saved successfully.",
+                        extra_tags="alert-success",
+                    )
                 else:
-                    system_settings.enable_google_sheets = False
-                    system_settings.save()
+                    messages.add_message(
+                        request,
+                        messages.SUCCESS,
+                        "Google Drive configuration updated successfully.",
+                        extra_tags="alert-success",
+                    )
+                return HttpResponseRedirect(reverse('dashboard'))
+            else:
+                system_settings.enable_google_sheets = False
+                system_settings.save()
     add_breadcrumb(title="Google Sheet Sync Configuration", top_level=True, request=request)
     return render(request, 'dojo/google_sheet_configuration.html', {
         'name': 'Google Sheet Sync Configuration',
@@ -188,7 +183,7 @@ def validate_drive_authentication(request, cred_str, drive_folder_ID):
                             messages.ERROR,
                             'Unable to write to the given Google Drive folder',
                             extra_tags='alert-danger')
-                    if error.resp.status == 404:
+                    elif error.resp.status == 404:
                         messages.add_message(
                             request,
                             messages.ERROR,
@@ -207,7 +202,10 @@ def export_to_sheet(request, tid):
     if google_sheets_enabled is False:
         raise PermissionDenied
     test = Test.objects.get(id=tid)
-    spreadsheet_name = test.engagement.product.name + "-" + test.engagement.name + "-" + str(test.id)
+    spreadsheet_name = (
+        f"{test.engagement.product.name}-{test.engagement.name}-{str(test.id)}"
+    )
+
     service_account_info = json.loads(system_settings.credentials)
     SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
     credentials = service_account.Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
@@ -227,7 +225,7 @@ def export_to_sheet(request, tid):
             if len(errors) > 0:
                 product_tab = Product_Tab(test.engagement.product, title="Syncing Errors", tab="engagements")
                 product_tab.setEngagement(test.engagement)
-                spreadsheet_url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId
+                spreadsheet_url = f'https://docs.google.com/spreadsheets/d/{spreadsheetId}'
                 return render(
                     request, 'dojo/syncing_errors.html', {
                         'test': test,
@@ -286,7 +284,10 @@ def create_googlesheet(request, tid):
     sheets_service = googleapiclient.discovery.build('sheets', 'v4', credentials=credentials, cache_discovery=False)
     drive_service = googleapiclient.discovery.build('drive', 'v3', credentials=credentials, cache_discovery=False)
     # Create a new spreadsheet
-    spreadsheet_name = test.engagement.product.name + "-" + test.engagement.name + "-" + str(test.id)
+    spreadsheet_name = (
+        f"{test.engagement.product.name}-{test.engagement.name}-{str(test.id)}"
+    )
+
     spreadsheet = {
         'properties': {
             'title': spreadsheet_name

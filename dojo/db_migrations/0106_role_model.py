@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
         ('dojo', '0105_endpoint_host_migration'),
     ]
 
-    def populate_roles(apps, schema_editor):
+    def populate_roles(self, schema_editor):
         call_command('loaddata', 'role')
 
     operations = [
