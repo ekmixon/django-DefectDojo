@@ -20,7 +20,7 @@ django-watson==1.6.2
 django-prometheus==2.2.0
 Django==3.2.14
 djangorestframework==3.13.1
-gunicorn==20.1.0
+gunicorn==22.0.0
 html2text==2020.1.16
 humanize==4.2.3
 jira==3.0.1
@@ -74,3 +74,4 @@ djangosaml2==1.5.1
 drf-spectacular==0.22.1
 django-ratelimit==3.0.1
 argon2-cffi==21.3.0
+sqlparse>=0.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
