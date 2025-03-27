@@ -20,7 +20,7 @@ django-watson==1.6.2
 django-prometheus==2.2.0
 Django==3.2.14
 djangorestframework==3.13.1
-gunicorn==20.1.0
+gunicorn==23.0.0
 html2text==2020.1.16
 humanize==4.2.3
 jira==3.0.1
